@@ -192,8 +192,15 @@ class _DonateScreenState extends State<DonateScreen> {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              color: AppTheme.deepGreen,
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              decoration: const BoxDecoration(
+                color: AppTheme.deepGreen,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -300,50 +307,39 @@ class _DonateScreenState extends State<DonateScreen> {
                             _runAiTagging();
                           },
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            height: 200,
+                            width: double.infinity,
+                            constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
                             decoration: BoxDecoration(
+                              color: AppTheme.deepGreen.withOpacity(0.08), // igual que Sell
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: AppTheme.muted,
-                                style: BorderStyle.solid,
+                                color: AppTheme.deepGreen,
                                 width: 2,
                               ),
-                              color: AppTheme.muted.withValues(alpha: 0.3),
                             ),
-                            child: Row(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Container(
-                                  height: 48,
-                                  width: 48,
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.deepGreen.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt_rounded,
-                                    color: AppTheme.deepGreen,
+                                Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 48,
+                                  color: AppTheme.foreground,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to upload photo',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.foreground,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Take or select a photo',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.foreground,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Camera · Photo Library',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.mutedForeground,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'JPG, PNG, WEBP up to 10MB',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.mutedForeground,
+                                  ),
                                 ),
                               ],
                             ),

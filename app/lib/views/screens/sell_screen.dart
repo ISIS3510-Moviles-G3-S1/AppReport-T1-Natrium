@@ -348,7 +348,7 @@ class _PhotoUpload extends StatelessWidget {
         width: double.infinity,
         constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
         decoration: BoxDecoration(
-          color: Colors.white, // fondo blanco SIEMPRE
+          color: AppTheme.deepGreen.withOpacity(0.08), // verde opaco
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppTheme.deepGreen, // borde verde oscuro
