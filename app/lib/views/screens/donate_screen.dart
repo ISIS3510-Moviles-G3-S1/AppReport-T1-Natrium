@@ -1,5 +1,8 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+
 import '../../core/app_theme.dart';
+import '../widgets/custom_bottom_nav_bar.dart';
 
 class DonateScreen extends StatefulWidget {
   const DonateScreen({super.key});
@@ -146,6 +149,40 @@ class _DonateScreenState extends State<DonateScreen> {
               ],
             ),
           ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: Transform.translate(
+          offset: const Offset(0, 16),
+          child: Container(
+            height: 68,
+            width: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.deepGreen.withOpacity(0.25),
+                width: 4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              backgroundColor: AppTheme.sage,
+              foregroundColor: AppTheme.sageDark,
+              elevation: 0,
+              shape: const CircleBorder(),
+              onPressed: () => Navigator.of(context).pushNamed('/sell'),
+              child: const Icon(Icons.add_rounded, size: 36),
+            ),
+          ),
+        ),
+        bottomNavigationBar: CustomBottomNavBar(
+          currentIndex: 2,
+          onTap: (_) {},
         ),
       );
     }
@@ -602,6 +639,40 @@ class _DonateScreenState extends State<DonateScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 16),
+        child: Container(
+          height: 68,
+          width: 68,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.deepGreen.withOpacity(0.25),
+              width: 4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            backgroundColor: AppTheme.sage,
+            foregroundColor: AppTheme.sageDark,
+            elevation: 0,
+            shape: const CircleBorder(),
+            onPressed: () => context.go('/sell'),
+            child: const Icon(Icons.add_rounded, size: 36),
+          ),
+        ),
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 2,
+        onTap: (_) {},
       ),
     );
   }
