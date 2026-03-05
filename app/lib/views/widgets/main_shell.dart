@@ -14,7 +14,7 @@ class MainShell extends StatelessWidget {
       backgroundColor: AppTheme.background,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Transform.translate(
-        offset: const Offset(0, 16),
+        offset: const Offset(0, 40),
         child: Container(
           height: 68,
           width: 68,
@@ -59,17 +59,20 @@ class MainShell extends StatelessWidget {
                 onTap: () => navigationShell.goBranch(0),
               ),
               _NavIcon(
-                icon: Icons.grid_view_rounded,
+                icon: Icons.search_rounded,
                 index: 1,
                 currentIndex: navigationShell.currentIndex,
                 onTap: () => navigationShell.goBranch(1),
               ),
               const SizedBox(width: 48), // space under the center FAB
-              _NavIcon(
-                icon: Icons.list_rounded,
-                index: 3,
-                currentIndex: navigationShell.currentIndex,
-                onTap: () => navigationShell.goBranch(3),
+              Transform.translate(
+                offset: const Offset(0, 4),
+                child: _NavIcon(
+                  icon: Icons.list_rounded,
+                  index: 3,
+                  currentIndex: navigationShell.currentIndex,
+                  onTap: () => navigationShell.goBranch(3),
+                ),
               ),
               _NavIcon(
                 icon: Icons.person_rounded,
@@ -102,7 +105,7 @@ class _NavIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool selected = index == currentIndex;
     final Color color =
-        selected ? AppTheme.foreground : AppTheme.mutedForeground;
+        selected ? AppTheme.sage : AppTheme.deepGreen;
     return IconButton(
       onPressed: onTap,
       icon: Icon(icon, color: color),

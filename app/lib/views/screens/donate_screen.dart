@@ -152,7 +152,7 @@ class _DonateScreenState extends State<DonateScreen> {
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
         floatingActionButton: Transform.translate(
-          offset: const Offset(0, 16),
+          offset: const Offset(0, 40),
           child: Container(
             height: 68,
             width: 68,
@@ -640,7 +640,7 @@ class _DonateScreenState extends State<DonateScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Transform.translate(
-        offset: const Offset(0, 16),
+        offset: const Offset(0, 40),
         child: Container(
           height: 68,
           width: 68,

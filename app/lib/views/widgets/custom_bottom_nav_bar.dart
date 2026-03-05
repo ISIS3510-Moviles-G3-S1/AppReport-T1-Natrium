@@ -51,17 +51,20 @@ class CustomBottomNavBar extends StatelessWidget {
               onTap: () => _handleTap(0),
             ),
             _NavIcon(
-              icon: Icons.grid_view_rounded,
+              icon: Icons.search_rounded,
               index: 1,
               currentIndex: currentIndex,
               onTap: () => _handleTap(1),
             ),
             const SizedBox(width: 48), // space under the center FAB
-            _NavIcon(
-              icon: Icons.list_rounded,
-              index: 3,
-              currentIndex: currentIndex,
-              onTap: () => _handleTap(3),
+            Transform.translate(
+              offset: const Offset(0, 4),
+              child: _NavIcon(
+                icon: Icons.list_rounded,
+                index: 3,
+                currentIndex: currentIndex,
+                onTap: () => _handleTap(3),
+              ),
             ),
             _NavIcon(
               icon: Icons.person_rounded,
@@ -92,7 +95,7 @@ class _NavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool selected = index == currentIndex;
-    final Color color = selected ? AppTheme.foreground : AppTheme.mutedForeground;
+    final Color color = selected ? AppTheme.sage : AppTheme.deepGreen;
     return IconButton(
       onPressed: onTap,
       icon: Icon(icon, color: color),
