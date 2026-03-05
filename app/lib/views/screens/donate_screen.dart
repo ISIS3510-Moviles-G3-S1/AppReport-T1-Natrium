@@ -189,7 +189,8 @@ class _DonateScreenState extends State<DonateScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
           children: [
             Container(
               width: double.infinity,
@@ -243,9 +244,10 @@ class _DonateScreenState extends State<DonateScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Photo',
