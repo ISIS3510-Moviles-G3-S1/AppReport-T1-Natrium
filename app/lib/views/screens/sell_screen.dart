@@ -344,7 +344,9 @@ class _PhotoUpload extends StatelessWidget {
         );
       },
       child: Container(
-        height: 180,
+        height: 200,
+        width: double.infinity,
+        constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
         decoration: BoxDecoration(
           color: Colors.white, // fondo blanco SIEMPRE
           borderRadius: BorderRadius.circular(16),

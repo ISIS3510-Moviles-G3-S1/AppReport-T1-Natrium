@@ -13,21 +13,42 @@ class MainShell extends StatelessWidget {
       body: navigationShell,
       backgroundColor: AppTheme.background,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppTheme.sage,
-        foregroundColor: AppTheme.sageDark,
-        elevation: 0,
-        shape: const CircleBorder(),
-        onPressed: () => navigationShell.goBranch(2),
-        child: const Icon(Icons.add_rounded, size: 28),
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 16),
+        child: Container(
+          height: 68,
+          width: 68,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.deepGreen.withOpacity(0.25),
+              width: 4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            backgroundColor: AppTheme.sage,
+            foregroundColor: AppTheme.sageDark,
+            elevation: 0,
+            shape: const CircleBorder(),
+            onPressed: () => navigationShell.goBranch(2),
+            child: const Icon(Icons.add_rounded, size: 36),
+          ),
+        ),
       ),
       bottomNavigationBar: BottomAppBar(
         color: Colors.white,
         elevation: 4,
         shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
+        notchMargin: 4,
         child: SizedBox(
-          height: 64,
+          height: 56,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
