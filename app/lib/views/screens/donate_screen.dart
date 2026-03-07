@@ -1,5 +1,8 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+
 import '../../core/app_theme.dart';
+import '../widgets/custom_bottom_nav_bar.dart';
 
 class DonateScreen extends StatefulWidget {
   const DonateScreen({super.key});
@@ -147,16 +150,58 @@ class _DonateScreenState extends State<DonateScreen> {
             ),
           ),
         ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: Transform.translate(
+          offset: const Offset(0, 40),
+          child: Container(
+            height: 68,
+            width: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.deepGreen.withOpacity(0.25),
+                width: 4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              backgroundColor: AppTheme.sage,
+              foregroundColor: AppTheme.sageDark,
+              elevation: 0,
+              shape: const CircleBorder(),
+              onPressed: () => Navigator.of(context).pushNamed('/sell'),
+              child: const Icon(Icons.add_rounded, size: 36),
+            ),
+          ),
+        ),
+        bottomNavigationBar: CustomBottomNavBar(
+          currentIndex: 2,
+          onTap: (_) {},
+        ),
       );
     }
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              color: AppTheme.deepGreen,
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              decoration: const BoxDecoration(
+                color: AppTheme.deepGreen,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -199,9 +244,10 @@ class _DonateScreenState extends State<DonateScreen> {
                 ],
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Photo',
@@ -263,50 +309,39 @@ class _DonateScreenState extends State<DonateScreen> {
                             _runAiTagging();
                           },
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            height: 200,
+                            width: double.infinity,
+                            constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
                             decoration: BoxDecoration(
+                              color: AppTheme.deepGreen.withOpacity(0.08), // igual que Sell
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: AppTheme.muted,
-                                style: BorderStyle.solid,
+                                color: AppTheme.deepGreen,
                                 width: 2,
                               ),
-                              color: AppTheme.muted.withValues(alpha: 0.3),
                             ),
-                            child: Row(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Container(
-                                  height: 48,
-                                  width: 48,
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.deepGreen.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt_rounded,
-                                    color: AppTheme.deepGreen,
+                                Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 48,
+                                  color: AppTheme.foreground,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap to upload photo',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.foreground,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Take or select a photo',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.foreground,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Camera · Photo Library',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.mutedForeground,
-                                      ),
-                                    ),
-                                  ],
+                                Text(
+                                  'JPG, PNG, WEBP up to 10MB',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.mutedForeground,
+                                  ),
                                 ),
                               ],
                             ),
@@ -602,6 +637,40 @@ class _DonateScreenState extends State<DonateScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 40),
+        child: Container(
+          height: 68,
+          width: 68,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.deepGreen.withOpacity(0.25),
+              width: 4,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: FloatingActionButton(
+            backgroundColor: AppTheme.sage,
+            foregroundColor: AppTheme.sageDark,
+            elevation: 0,
+            shape: const CircleBorder(),
+            onPressed: () => context.go('/sell'),
+            child: const Icon(Icons.add_rounded, size: 36),
+          ),
+        ),
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        currentIndex: 2,
+        onTap: (_) {},
       ),
     );
   }
