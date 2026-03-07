@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
   // Base tokens from index.css (HSL converted to hex)
   static const Color black = Color(0xFF000000); // --primary
-  static const Color gray = Color(0xFFBFBFBF); // --gray
+  static const Color gray = Color(0xFFAFAFAF); // --gray (slightly darker)
   static const Color white = Color(0xFFFFFFFF); // --white / --card / --background
 
   // Brand / semantic colors
@@ -42,11 +42,10 @@ class AppTheme {
           foregroundColor: white,
           elevation: 0,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: cardBg,
           elevation: 2,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
