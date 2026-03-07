@@ -14,7 +14,7 @@ class MainShell extends StatelessWidget {
       backgroundColor: AppTheme.background,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Transform.translate(
-        offset: const Offset(0, 40),
+        offset: const Offset(0, 20),
         child: Container(
           height: 68,
           width: 68,
@@ -37,7 +37,7 @@ class MainShell extends StatelessWidget {
             foregroundColor: AppTheme.sageDark,
             elevation: 0,
             shape: const CircleBorder(),
-            onPressed: () => navigationShell.goBranch(2),
+            onPressed: () => context.go('/sell'),
             child: const Icon(Icons.add_rounded, size: 36),
           ),
         ),
