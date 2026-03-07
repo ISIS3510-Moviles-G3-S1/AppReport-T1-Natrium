@@ -5,13 +5,14 @@ import '../views/screens/browse_screen.dart';
 import '../views/screens/item_detail_screen.dart';
 import '../views/screens/sell_screen.dart';
 import '../views/screens/profile_screen.dart';
+import '../views/screens/activity_listings_screen.dart';
 import '../views/screens/not_found_screen.dart';
 import '../views/screens/swap_screen.dart';
 import '../views/screens/donate_screen.dart';
 import '../views/widgets/main_shell.dart';
 import '../view_models/item_detail_view_model.dart';
 import 'package:provider/provider.dart';
-
+//import 'package:provider/provider.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 GoRouter createAppRouter() {
@@ -51,6 +52,16 @@ GoRouter createAppRouter() {
                 path: '/sell',
                 pageBuilder: (context, state) =>
                     const NoTransitionPage(child: SellScreen()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: GlobalKey<NavigatorState>(),
+            routes: [
+              GoRoute(
+                path: '/activity-listings',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: ActivityListingsScreen()),
               ),
             ],
           ),
