@@ -57,6 +57,12 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 40),
+                      Image.asset(
+                        'assets/images/uni_market_logo.png',
+                        height: 90,
+                        fit: BoxFit.contain,
+                      ),
                       const SizedBox(height: 16),
                       Column(
                         children: [
