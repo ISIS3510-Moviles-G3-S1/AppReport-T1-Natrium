@@ -24,7 +24,10 @@ class AppTheme {
   static const Color foreground = Color(0xFF2B2B2B); // --foreground / charcoal
   static const Color destructive = Color(0xFFDC2626);
 
-  static ThemeData get theme => ThemeData(
+  // ─── Light theme (Strategy: DayThemeStrategy) ─────────────────────────────
+
+  /// The app's light theme — used by [DayThemeStrategy] (6 AM – 6:59 PM).
+  static ThemeData get lightTheme => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.light(
           primary: black,
@@ -118,6 +121,121 @@ class AppTheme {
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: foreground,
+          ),
+        ),
+      );
+
+  /// Backward-compatible alias so existing code that references
+  /// [AppTheme.theme] continues to compile without changes.
+  static ThemeData get theme => lightTheme;
+
+  // ─── Dark theme (Strategy: NightThemeStrategy) ─────────────────────────────
+
+  // Dark-mode palette — derived from the brand colours with reduced
+  // brightness so the UI is comfortable in low-light environments.
+  static const Color _darkBackground = Color(0xFF121212);
+  static const Color _darkSurface = Color(0xFF1E1E1E);
+  static const Color _darkCard = Color(0xFF252525);
+  static const Color _darkAppBar = Color(0xFF1A2E25); // deep-green tinted dark
+  static const Color _darkOnSurface = Color(0xFFE8E8E8);
+  static const Color _darkOnSurfaceMuted = Color(0xFFAAAAAA);
+
+  /// The app's dark theme — used by [NightThemeStrategy] (7 PM – 5:59 AM).
+  static ThemeData get darkTheme => ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.dark(
+          primary: sage,           // sage pops on dark backgrounds
+          onPrimary: sageDark,
+          secondary: deepGreen,
+          onSecondary: white,
+          surface: _darkSurface,
+          onSurface: _darkOnSurface,
+          error: destructive,
+          onError: white,
+        ),
+        scaffoldBackgroundColor: _darkBackground,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: _darkAppBar,
+          foregroundColor: white,
+          elevation: 0,
+        ),
+        cardTheme: CardThemeData(
+          color: _darkCard,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: deepGreen,
+            foregroundColor: white,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _darkOnSurface,
+            side: BorderSide(color: _darkOnSurfaceMuted),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _darkCard,
+          border:
+              OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        textTheme: GoogleFonts.manropeTextTheme(
+          ThemeData.dark().textTheme,
+        ).copyWith(
+          displayLarge: GoogleFonts.poppins(
+            fontSize: 57,
+            fontWeight: FontWeight.w400,
+            color: _darkOnSurface,
+          ),
+          displayMedium: GoogleFonts.poppins(
+            fontSize: 45,
+            fontWeight: FontWeight.w400,
+            color: _darkOnSurface,
+          ),
+          displaySmall: GoogleFonts.poppins(
+            fontSize: 36,
+            fontWeight: FontWeight.w400,
+            color: _darkOnSurface,
+          ),
+          headlineLarge: GoogleFonts.poppins(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: _darkOnSurface,
+          ),
+          headlineMedium: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: _darkOnSurface,
+          ),
+          headlineSmall: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: _darkOnSurface,
+          ),
+          titleLarge: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _darkOnSurface,
+          ),
+          titleMedium: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _darkOnSurface,
+          ),
+          titleSmall: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _darkOnSurface,
           ),
         ),
       );
