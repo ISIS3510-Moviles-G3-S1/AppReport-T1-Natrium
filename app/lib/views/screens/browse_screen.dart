@@ -18,164 +18,145 @@ class BrowseScreen extends StatelessWidget {
     final mutedText =
         isDark ? colorScheme.onSurface.withOpacity(0.72) : AppTheme.mutedForeground;
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            color: colorScheme.primary,
-            child: Text(
-              'Browse',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                  ) ??
-                  const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-            ),
-          ),
-          // Add tab bar for Browse and For You
-          Container(
-            color: colorScheme.surface,
-            child: Row(
+      body: SafeArea(
+        top: false,
+        child: Consumer<BrowseViewModel>(
+          builder: (context, vm, _) {
+            final items = vm.filteredAndSorted;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {}, // Already on Browse
-                    child: Text('Browse', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
-                  ),
-                ),
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => ForYouScreen()),
-                    ),
-                    child: Text('For You', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: Consumer<BrowseViewModel>(
-                builder: (context, vm, _) {
-                  final items = vm.filteredAndSorted;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                // Top tab bar
+                Container(
+                  color: colorScheme.surface,
+                  child: Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.search_rounded,
-                                  size: 22,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    onChanged: (v) => vm.search = v,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search items...'
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => vm.showFilters = true,
-                                  icon: const Icon(Icons.tune_rounded),
-                                  color: colorScheme.primary,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                          ],
+                      Expanded(
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: colorScheme.primary.withOpacity(0.12),
+                            foregroundColor: colorScheme.primary,
+                          ),
+                          onPressed: () {}, // Already on Browse
+                          child: Text('Browse', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                       Expanded(
-                        child: Stack(
-                          children: [
-                            ListView(
-                              padding: const EdgeInsets.all(12),
-                              children: [
-                                Text(
-                                  '${items.length} items',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: mutedText,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (items.isEmpty)
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 48),
-                                      child: Column(
-                                        children: [
-                                          const Text(
-                                            '🔍',
-                                            style: TextStyle(fontSize: 48),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'No items found',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              color: colorScheme.onSurface,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Try different filters',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: mutedText,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          childAspectRatio: 0.72,
-                                          crossAxisSpacing: 12,
-                                          mainAxisSpacing: 12,
-                                        ),
-                                    itemCount: items.length,
-                                    itemBuilder: (context, index) =>
-                                        _ListingCard(
-                                          listing: items[index],
-                                          vm: vm,
-                                        ),
-                                  ),
-                              ],
-                            ),
-                            if (vm.showFilters) FilterSheet(vm: vm),
-                          ],
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: colorScheme.onSurface,
+                          ),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => ForYouScreen()),
+                          ),
+                          child: Text('For You', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
+                  ),
+                ),
+                // Search bar and filters
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search_rounded,
+                        size: 22,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          onChanged: (v) => vm.search = v,
+                          decoration: const InputDecoration(
+                            hintText: 'Search items...'
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => vm.showFilters = true,
+                        icon: const Icon(Icons.tune_rounded),
+                        color: colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ),
+                // Item grid with scrolling
+                Expanded(
+                  child: Stack(
+                    children: [
+                      ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: [
+                          Text(
+                            '${items.length} items',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: mutedText,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (items.isEmpty)
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 48),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      '🔍',
+                                      style: TextStyle(fontSize: 48),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'No items found',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Try different filters',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: mutedText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const ClampingScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.72,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                  ),
+                              itemCount: items.length,
+                              itemBuilder: (context, index) =>
+                                  _ListingCard(
+                                    listing: items[index],
+                                    vm: vm,
+                                  ),
+                            ),
+                        ],
+                      ),
+                      if (vm.showFilters) FilterSheet(vm: vm),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

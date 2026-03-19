@@ -150,174 +150,124 @@ class ForYouScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
     final mutedText = isDark ? colorScheme.onSurface.withOpacity(0.72) : AppTheme.mutedForeground;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('For You'),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            color: colorScheme.primary,
-            child: Text(
-              'For You',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                  ) ??
-                  const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-            ),
-          ),
-          // Tab bar for Browse and For You
-          Container(
-            color: colorScheme.surface,
-            child: Row(
+    return Consumer<BrowseViewModel>(
+      builder: (context, vm, _) {
+        final filteredItems = vm.forYouRecommendations.where((item) {
+          final searchLower = vm.search.toLowerCase();
+          return item.name.toLowerCase().contains(searchLower) ||
+              item.category.toLowerCase().contains(searchLower);
+        }).toList();
+        return Scaffold(
+          body: SafeArea(
+            top: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => BrowseScreen()),
-                    ),
-                    child: Text('Browse', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                Container(
+                  color: colorScheme.surface,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: colorScheme.onSurface,
+                          ),
+                          onPressed: () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(builder: (_) => BrowseScreen()),
+                          ),
+                          child: Text('Browse', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: colorScheme.primary.withOpacity(0.12),
+                            foregroundColor: colorScheme.primary,
+                          ),
+                          onPressed: () {}, // Already on For You
+                          child: Text('For You', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search_rounded,
+                        size: 22,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          onChanged: (v) => vm.search = v,
+                          decoration: const InputDecoration(
+                            hintText: 'Search items...'
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => vm.showFilters = true,
+                        icon: const Icon(Icons.tune_rounded),
+                        color: colorScheme.primary,
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
-                  child: TextButton(
-                    onPressed: () {}, // Already on For You
-                    child: Text('For You', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                  child: Stack(
+                    children: [
+                      ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: [
+                          Text(
+                            '${filteredItems.length} items',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: mutedText,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (filteredItems.isEmpty)
+                            Center(
+                              child: Text(
+                                'No recommendations found.',
+                                style: TextStyle(color: mutedText),
+                              ),
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const ClampingScrollPhysics(),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.72,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: filteredItems.length,
+                              itemBuilder: (context, index) => _ListingCard(
+                                listing: filteredItems[index],
+                                vm: vm,
+                                onTap: () => context.push('/item/${filteredItems[index].id}'),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (vm.showFilters) FilterSheet(vm: vm),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: Consumer<BrowseViewModel>(
-                builder: (context, vm, _) {
-                  // Use the same filter/search UI as Browse
-                  final filteredItems = vm.forYouRecommendations.where((item) {
-                    final searchLower = vm.search.toLowerCase();
-                    return item.name.toLowerCase().contains(searchLower) ||
-                        item.category.toLowerCase().contains(searchLower);
-                  }).toList();
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.search_rounded,
-                                  size: 22,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    onChanged: (v) => vm.search = v,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search personalized items...'
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => vm.showFilters = true,
-                                  icon: const Icon(Icons.tune_rounded),
-                                  color: colorScheme.primary,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            ListView(
-                              padding: const EdgeInsets.all(12),
-                              children: [
-                                Text(
-                                  'Personalized Recommendations',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: mutedText,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                if (filteredItems.isEmpty)
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 48),
-                                      child: Column(
-                                        children: [
-                                          const Text(
-                                            '🔍',
-                                            style: TextStyle(fontSize: 48),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'No recommendations found',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              color: colorScheme.onSurface,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Try different filters',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: mutedText,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 2,
-                                          childAspectRatio: 0.72,
-                                          crossAxisSpacing: 12,
-                                          mainAxisSpacing: 12,
-                                        ),
-                                    itemCount: filteredItems.length,
-                                    itemBuilder: (context, index) => _ListingCard(
-                                      listing: filteredItems[index],
-                                      vm: vm,
-                                      onTap: () => context.push('/item/${filteredItems[index].id}'),
-                                    ),
-                                  ),
-                                const SizedBox(height: 12),
-                              ],
-                            ),
-                            if (vm.showFilters) FilterSheet(vm: vm),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
