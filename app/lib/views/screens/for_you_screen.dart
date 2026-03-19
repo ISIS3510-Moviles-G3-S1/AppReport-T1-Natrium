@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/app_theme.dart';
 import '../../view_models/browse_view_model.dart';
 import '../widgets/filter_sheet.dart';
@@ -299,12 +300,7 @@ class ForYouScreen extends StatelessWidget {
                                     itemBuilder: (context, index) => _ListingCard(
                                       listing: filteredItems[index],
                                       vm: vm,
-                                      onTap: () {
-                                        Navigator.of(context).pushNamed(
-                                          '/item/${filteredItems[index].id}',
-                                          arguments: filteredItems[index],
-                                        );
-                                      },
+                                      onTap: () => context.push('/item/${filteredItems[index].id}'),
                                     ),
                                   ),
                                 const SizedBox(height: 12),
