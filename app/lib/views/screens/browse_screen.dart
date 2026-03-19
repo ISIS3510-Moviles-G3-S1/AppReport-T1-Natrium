@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../view_models/browse_view_model.dart';
 import '../../models/listing.dart';
 import '../widgets/filter_sheet.dart';
+import 'for_you_screen.dart';
 
 class BrowseScreen extends StatelessWidget {
   const BrowseScreen({super.key});
@@ -15,7 +16,7 @@ class BrowseScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
     final mutedText =
-        isDark ? colorScheme.onSurface.withValues(alpha: 0.72) : AppTheme.mutedForeground;
+        isDark ? colorScheme.onSurface.withOpacity(0.72) : AppTheme.mutedForeground;
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -23,7 +24,7 @@ class BrowseScreen extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            color: AppTheme.deepGreen,
+            color: colorScheme.primary,
             child: Text(
               'Browse',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -34,6 +35,28 @@ class BrowseScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
+            ),
+          ),
+          // Add tab bar for Browse and For You
+          Container(
+            color: colorScheme.surface,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {}, // Already on Browse
+                    child: Text('Browse', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ForYouScreen()),
+                    ),
+                    child: Text('For You', style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.primary)),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -47,131 +70,36 @@ class BrowseScreen extends StatelessWidget {
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(
-                              Icons.search_rounded,
-                              size: 22,
-                              color: mutedText,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                onChanged: (v) => vm.search = v,
-                                decoration: InputDecoration(
-                                  hintText: 'Search items...',
-                                  filled: true,
-                                  fillColor: isDark ? colorScheme.surface : Colors.white,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(999),
-                                    borderSide: BorderSide(
-                                      color:
-                                          isDark
-                                              ? colorScheme.outline.withValues(alpha: 0.65)
-                                              : AppTheme.gray.withValues(alpha: 0.8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.search_rounded,
+                                  size: 22,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    onChanged: (v) => vm.search = v,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Search items...'
                                     ),
                                   ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
                                 ),
-                              ),
+                                IconButton(
+                                  onPressed: () => vm.showFilters = true,
+                                  icon: const Icon(Icons.tune_rounded),
+                                  color: colorScheme.primary,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () => vm.aiSearch = !vm.aiSearch,
-                              style: IconButton.styleFrom(
-                                backgroundColor:
-                                    isDark ? colorScheme.surface : Colors.white,
-                                foregroundColor: AppTheme.deepGreen,
-                                side: BorderSide(
-                                  color:
-                                      isDark
-                                          ? colorScheme.outline.withValues(alpha: 0.65)
-                                          : AppTheme.gray.withValues(alpha: 0.8),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                              icon: const Icon(Icons.camera_alt_rounded),
-                            ),
-                            IconButton(
-                              onPressed: () => vm.showFilters = true,
-                              style: IconButton.styleFrom(
-                                backgroundColor:
-                                    isDark ? colorScheme.surface : Colors.white,
-                                foregroundColor: AppTheme.deepGreen,
-                                side: BorderSide(
-                                  color:
-                                      isDark
-                                          ? colorScheme.outline.withValues(alpha: 0.65)
-                                          : AppTheme.gray.withValues(alpha: 0.8),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                              icon: const Icon(Icons.tune_rounded),
-                            ),
+                            const SizedBox(height: 8),
                           ],
                         ),
                       ),
-                      if (vm.aiSearch)
-                        Container(
-                          margin: const EdgeInsets.only(left: 12, right: 12, top: 8),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color:
-                                isDark
-                                    ? colorScheme.surfaceContainerHigh
-                                    : AppTheme.accent.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color:
-                                  isDark
-                                      ? colorScheme.outline.withValues(alpha: 0.7)
-                                      : AppTheme.accent.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.auto_awesome,
-                                size: 16,
-                                color: isDark ? colorScheme.primary : Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Upload a photo to find similar items',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color:
-                                        isDark
-                                            ? colorScheme.onSurface
-                                            : Colors.white,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {},
-                                child: Text(
-                                  'Upload',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        isDark
-                                            ? colorScheme.primary
-                                            : AppTheme.accent,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       Expanded(
                         child: Stack(
                           children: [
@@ -263,8 +191,7 @@ class _ListingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
-    final mutedText =
-        isDark ? colorScheme.onSurface.withValues(alpha: 0.70) : AppTheme.mutedForeground;
+    final mutedText = isDark ? colorScheme.onSurface.withOpacity(0.70) : AppTheme.mutedForeground;
     return GestureDetector(
       onTap: () => context.push('/item/${listing.id}'),
       child: Card(
@@ -300,8 +227,8 @@ class _ListingCard extends StatelessWidget {
                         radius: 16,
                         backgroundColor:
                             isDark
-                                ? colorScheme.surface.withValues(alpha: 0.92)
-                                : Colors.white.withValues(alpha: 0.9),
+                                ? colorScheme.surface.withOpacity(0.92)
+                                : Colors.white.withOpacity(0.9),
                         child: Icon(
                           vm.isSaved(listing.id)
                               ? Icons.favorite_rounded
@@ -368,31 +295,14 @@ class _ListingCard extends StatelessWidget {
                           color: AppTheme.sage,
                         ),
                       ),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            size: 12,
-                            color: AppTheme.mustard,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${listing.rating}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: mutedText,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        listing.seller,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: mutedText,
+                        ),
                       ),
                     ],
-                  ),
-                  Text(
-                    listing.seller,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: mutedText,
-                    ),
                   ),
                 ],
               ),
