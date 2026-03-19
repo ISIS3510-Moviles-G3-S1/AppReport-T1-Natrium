@@ -12,70 +12,87 @@ class ItemDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final backTextColor =
+        isDark ? colorScheme.onSurface.withValues(alpha: 0.78) : AppTheme.mutedForeground;
     return Scaffold(
-      body: Consumer<ItemDetailViewModel>(
-        builder: (context, vm, _) {
-          final item = vm.item;
-          if (item == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () => context.go('/browse'),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.chevron_left_rounded,
-                            size: 18,
-                            color: AppTheme.mutedForeground,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Back to Browse',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.mutedForeground,
+      body: SafeArea(
+        child: Consumer<ItemDetailViewModel>(
+          builder: (context, vm, _) {
+            final item = vm.item;
+            if (item == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => context.go('/browse'),
+                          child: Padding(
+                            // Larger touch target for easier tapping.
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.chevron_left_rounded,
+                                  size: 20,
+                                  color: backTextColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Back to Browse',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: backTextColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Image.asset(
-                      'assets/images/uni_market_logo.png',
-                      height: 28,
-                      fit: BoxFit.contain,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Gallery(item: item, vm: vm),
-                          const SizedBox(height: 12),
-                          _InfoSection(item: item, vm: vm),
-                        ],
+                      Image.asset(
+                        'assets/images/uni_market_logo.png',
+                        height: 28,
+                        fit: BoxFit.contain,
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _SimilarSection(vm: vm),
-              ],
-            ),
-          );
-        },
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _Gallery(item: item, vm: vm),
+                            const SizedBox(height: 12),
+                            _InfoSection(item: item, vm: vm),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _SimilarSection(vm: vm),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -89,6 +106,8 @@ class _Gallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       children: [
         ClipRRect(
@@ -100,7 +119,7 @@ class _Gallery extends StatelessWidget {
               fit: BoxFit.cover,
               placeholder:
                   (_, __) => Container(
-                    color: AppTheme.muted,
+                    color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               errorWidget:
@@ -123,7 +142,10 @@ class _Gallery extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: active ? AppTheme.deepGreen : Colors.transparent,
+                    color:
+                        active
+                            ? (isDark ? colorScheme.primary : AppTheme.deepGreen)
+                            : Colors.transparent,
                     width: 3,
                   ),
                 ),
@@ -153,6 +175,13 @@ class _InfoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final bodyTextColor = isDark ? colorScheme.onSurface : AppTheme.foreground;
+    final secondaryTextColor =
+      isDark ? colorScheme.onSurface.withValues(alpha: 0.76) : AppTheme.mutedForeground;
+    final borderColor = isDark ? colorScheme.outline : AppTheme.foreground;
+    final cardColor = isDark ? colorScheme.surface : AppTheme.cardBg;
     final scoreLabel =
         item.aiScore >= 90
             ? 'Excellent'
@@ -166,7 +195,7 @@ class _InfoSection extends StatelessWidget {
             ? AppTheme.sage
             : item.aiScore >= 80
             ? AppTheme.warmBeige
-            : AppTheme.mutedForeground;
+            : secondaryTextColor;
     final exchangeLabel =
         item.exchangeType == 'sell'
             ? 'For Sale'
@@ -195,7 +224,7 @@ class _InfoSection extends StatelessWidget {
                 vm.saved
                     ? Icons.favorite
                     : Icons.favorite_border_outlined,
-                color: vm.saved ? Colors.red : AppTheme.mutedForeground,
+                color: vm.saved ? Colors.red : secondaryTextColor,
                 size: 22,
               ),
             ),
@@ -203,7 +232,7 @@ class _InfoSection extends StatelessWidget {
               onPressed: () {},
               icon: Icon(
                 Icons.ios_share_outlined,
-                color: AppTheme.mutedForeground,
+                color: secondaryTextColor,
                 size: 22,
               ),
             ),
@@ -225,10 +254,10 @@ class _InfoSection extends StatelessWidget {
             Chip(
               label: Text(
                 item.condition,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
               ),
               backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: AppTheme.foreground),
+              side: BorderSide(color: borderColor),
               shape: const StadiumBorder(),
             ),
             Chip(
@@ -238,7 +267,7 @@ class _InfoSection extends StatelessWidget {
               ),
               backgroundColor: AppTheme.sage.withValues(alpha: 0.35),
               side: BorderSide(color: AppTheme.sage.withValues(alpha: 0.6)),
-              labelStyle: TextStyle(color: AppTheme.foreground, fontSize: 12),
+              labelStyle: TextStyle(color: bodyTextColor, fontSize: 12),
               shape: const StadiumBorder(),
             ),
           ],
@@ -246,14 +275,14 @@ class _InfoSection extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            Icon(Icons.bolt_outlined, size: 16, color: AppTheme.mutedForeground),
+            Icon(Icons.bolt_outlined, size: 16, color: secondaryTextColor),
             const SizedBox(width: 6),
             Text(
               'AI-GENERATED TAGS',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.mutedForeground,
+                color: secondaryTextColor,
                 letterSpacing: 0.6,
               ),
             ),
@@ -267,37 +296,37 @@ class _InfoSection extends StatelessWidget {
             Chip(
               label: Text(
                 'Size ${item.size}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
               ),
               backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: AppTheme.foreground),
+              side: BorderSide(color: borderColor),
               shape: const StadiumBorder(),
             ),
             Chip(
               label: Text(
                 item.color,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
               ),
               backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: AppTheme.foreground),
+              side: BorderSide(color: borderColor),
               shape: const StadiumBorder(),
             ),
             Chip(
               label: Text(
                 item.category,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
               ),
               backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: AppTheme.foreground),
+              side: BorderSide(color: borderColor),
               shape: const StadiumBorder(),
             ),
             Chip(
               label: Text(
                 item.style,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
               ),
               backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: AppTheme.foreground),
+              side: BorderSide(color: borderColor),
               shape: const StadiumBorder(),
             ),
             ...item.tags
@@ -306,10 +335,10 @@ class _InfoSection extends StatelessWidget {
                   (t) => Chip(
                     label: Text(
                       t,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: bodyTextColor),
                     ),
                     backgroundColor: AppTheme.cardBg,
-                    side: BorderSide(color: AppTheme.foreground),
+                    side: BorderSide(color: borderColor),
                     shape: const StadiumBorder(),
                   ),
                 ),
@@ -319,9 +348,9 @@ class _InfoSection extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.cardBg,
+            color: cardColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.muted),
+            border: Border.all(color: isDark ? colorScheme.outline : AppTheme.muted),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,7 +371,7 @@ class _InfoSection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.black,
+                          color: bodyTextColor,
                         ),
                       ),
                     ],
@@ -360,7 +389,7 @@ class _InfoSection extends StatelessWidget {
               const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: item.aiScore / 100,
-                backgroundColor: AppTheme.gray,
+                backgroundColor: isDark ? colorScheme.surfaceContainerHighest : AppTheme.gray,
                 valueColor:
                     const AlwaysStoppedAnimation<Color>(AppTheme.deepGreen),
                 minHeight: 8,
@@ -368,7 +397,7 @@ class _InfoSection extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Based on photo analysis of fabric quality, visible wear, and overall condition.',
-                style: TextStyle(fontSize: 12, color: AppTheme.foreground),
+                style: TextStyle(fontSize: 12, color: bodyTextColor),
               ),
             ],
           ),
@@ -379,7 +408,7 @@ class _InfoSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.foreground,
+            color: bodyTextColor,
           ),
         ),
         const SizedBox(height: 4),
@@ -388,7 +417,7 @@ class _InfoSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
-            color: AppTheme.foreground,
+            color: bodyTextColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -407,8 +436,8 @@ class _InfoSection extends StatelessWidget {
                   vm.messageSent ? 'Message Sent!' : 'Message Seller',
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.foreground,
-                  side: BorderSide(color: AppTheme.foreground),
+                  foregroundColor: bodyTextColor,
+                  side: BorderSide(color: borderColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -425,8 +454,8 @@ class _InfoSection extends StatelessWidget {
                 ),
                 label: Text(vm.saved ? 'Saved' : 'Save Item'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.foreground,
-                  side: BorderSide(color: AppTheme.foreground),
+                  foregroundColor: bodyTextColor,
+                  side: BorderSide(color: borderColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -447,6 +476,11 @@ class _SellerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final bodyTextColor = isDark ? colorScheme.onSurface : AppTheme.foreground;
+    final secondaryTextColor =
+        isDark ? colorScheme.onSurface.withValues(alpha: 0.76) : AppTheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -523,7 +557,7 @@ class _SellerCard extends StatelessWidget {
                   seller.university,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.mutedForeground,
+                    color: secondaryTextColor,
                   ),
                 ),
                 Row(
@@ -535,6 +569,7 @@ class _SellerCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
+                        color: bodyTextColor,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -542,7 +577,7 @@ class _SellerCard extends StatelessWidget {
                       '${seller.sales} items sold',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.mutedForeground,
+                        color: secondaryTextColor,
                       ),
                     ),
                   ],
