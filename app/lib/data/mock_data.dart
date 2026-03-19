@@ -151,6 +151,7 @@ class MockData {
   ];
 
   static final itemDetails = [
+    // 1. Vintage Levi's Denim Jacket
     ItemDetail(
       id: 1,
       name: "Vintage Levi's Denim Jacket",
@@ -169,8 +170,7 @@ class MockData {
         verified: true,
       ),
       aiScore: 87,
-      description:
-          "Classic vintage Levi's denim jacket in good condition. Minor wear on the cuffs adds to its character. Perfect for layering in autumn and spring.",
+      description: "Classic vintage Levi's denim jacket in good condition. Minor wear on the cuffs adds to its character. Perfect for layering in autumn and spring.",
       images: [
         "https://images.unsplash.com/photo-1601333144130-8cbb312386b6?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop",
@@ -179,6 +179,7 @@ class MockData {
       tags: ["Casual", "Vintage", "Denim", "Layering", "Autumn"],
       exchangeType: "sell",
     ),
+    // 2. Floral Summer Dress
     ItemDetail(
       id: 2,
       name: "Floral Summer Dress",
@@ -197,8 +198,7 @@ class MockData {
         verified: true,
       ),
       aiScore: 95,
-      description:
-          "Beautiful floral summer dress worn only twice. Lightweight fabric, perfect for festivals or campus events. No stains or damage.",
+      description: "Beautiful floral summer dress worn only twice. Lightweight fabric, perfect for festivals or campus events. No stains or damage.",
       images: [
         "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300&h=300&fit=crop",
@@ -207,6 +207,7 @@ class MockData {
       tags: ["Boho", "Summer", "Floral", "Festival", "Light"],
       exchangeType: "swap",
     ),
+    // 3. Cream Knit Sweater
     ItemDetail(
       id: 3,
       name: "Cream Knit Sweater",
@@ -225,8 +226,7 @@ class MockData {
         verified: false,
       ),
       aiScore: 82,
-      description:
-          "Soft cream knit sweater from Zara. Gently used, no pilling. Great for cold evenings or cozy study sessions.",
+      description: "Soft cream knit sweater from Zara. Gently used, no pilling. Great for cold evenings or cozy study sessions.",
       images: [
         "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=300&h=300&fit=crop",
@@ -235,6 +235,7 @@ class MockData {
       tags: ["Knitwear", "Cozy", "Autumn", "Zara", "Soft"],
       exchangeType: "sell",
     ),
+    // 4. Black Slim Trousers
     ItemDetail(
       id: 4,
       name: "Black Slim Trousers",
@@ -253,8 +254,7 @@ class MockData {
         verified: false,
       ),
       aiScore: 72,
-      description:
-          "Slim-fit black trousers, slightly faded from washing but still presentable. Perfect for office or smart casual looks.",
+      description: "Slim-fit black trousers, slightly faded from washing but still presentable. Perfect for office or smart casual looks.",
       images: [
         "https://images.unsplash.com/photo-1594938298603-c8148c4b4086?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300&h=300&fit=crop",
@@ -263,6 +263,7 @@ class MockData {
       tags: ["Smart", "Office", "Classic", "Black", "Slim"],
       exchangeType: "donate",
     ),
+    // 5. Puffer Winter Jacket
     ItemDetail(
       id: 5,
       name: "Puffer Winter Jacket",
@@ -281,8 +282,7 @@ class MockData {
         verified: true,
       ),
       aiScore: 93,
-      description:
-          "Warm army-green puffer jacket. Worn only once last winter. Excellent insulation, water-resistant outer shell.",
+      description: "Warm army-green puffer jacket. Worn only once last winter. Excellent insulation, water-resistant outer shell.",
       images: [
         "https://images.unsplash.com/photo-1548126032-079a0fb0099d?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1507680434567-5739c80be1ac?w=300&h=300&fit=crop",
@@ -290,6 +290,118 @@ class MockData {
       ],
       tags: ["Winter", "Sporty", "Warm", "Puffer", "Green"],
       exchangeType: "sell",
+    ),
+    // 6. Silk Blouse Ivory
+    ItemDetail(
+      id: 6,
+      name: "Silk Blouse Ivory",
+      price: 22,
+      size: "S",
+      condition: "Good",
+      category: "Tops",
+      color: "Ivory",
+      style: "Elegant",
+      seller: Seller(
+        name: "Chloe M.",
+        university: "UPM Madrid",
+        rating: 4.7,
+        sales: 8,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Chloe",
+        verified: true,
+      ),
+      aiScore: 90,
+      description: "Elegant silk blouse in ivory. Perfect for evening events or formal occasions. No stains, gently used.",
+      images: [
+        "https://images.unsplash.com/photo-1485518882345-15568b007407?w=600&h=700&fit=crop",
+        "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
+        "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
+      ],
+      tags: ["Elegant", "Silk", "Evening"],
+      exchangeType: "sell",
+    ),
+    // 7. Canvas Tote Bag
+    ItemDetail(
+      id: 7,
+      name: "Canvas Tote Bag",
+      price: 10,
+      size: "One Size",
+      condition: "Like New",
+      category: "Accessories",
+      color: "Natural",
+      style: "Casual",
+      seller: Seller(
+        name: "Ines R.",
+        university: "Complutense",
+        rating: 4.5,
+        sales: 4,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ines",
+        verified: false,
+      ),
+      aiScore: 88,
+      description: "Eco-friendly canvas tote bag. Great for shopping or daily use. No visible wear.",
+      images: [
+        "https://images.unsplash.com/photo-1544816155-12df9643f363?w=600&h=700&fit=crop",
+        "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&h=300&fit=crop",
+        "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&h=300&fit=crop",
+      ],
+      tags: ["Eco", "Casual", "Bag"],
+      exchangeType: "donate",
+    ),
+    // 8. High-Waist Jeans
+    ItemDetail(
+      id: 8,
+      name: "High-Waist Jeans",
+      price: 28,
+      size: "M",
+      condition: "Good",
+      category: "Bottoms",
+      color: "Blue",
+      style: "Casual",
+      seller: Seller(
+        name: "Nora B.",
+        university: "UAM",
+        rating: 4.4,
+        sales: 6,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nora",
+        verified: false,
+      ),
+      aiScore: 85,
+      description: "Classic high-waist jeans. Comfortable fit, no tears or stains. Great for everyday wear.",
+      images: [
+        "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=600&h=700&fit=crop",
+        "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop",
+        "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop",
+      ],
+      tags: ["Denim", "Casual", "Classic"],
+      exchangeType: "sell",
+    ),
+    // 9. Striped Linen Shirt
+    ItemDetail(
+      id: 9,
+      name: "Striped Linen Shirt",
+      price: 16,
+      size: "L",
+      condition: "Good",
+      category: "Tops",
+      color: "White",
+      style: "Casual",
+      seller: Seller(
+        name: "Kai O.",
+        university: "UC3M",
+        rating: 4.6,
+        sales: 9,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kai",
+        verified: true,
+      ),
+      aiScore: 91,
+      description: "Lightweight striped linen shirt. Breathable and perfect for summer. No damage, gently used.",
+      images: [
+        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=600&h=700&fit=crop",
+        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=300&h=300&fit=crop",
+        "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=300&h=300&fit=crop",
+      ],
+      tags: ["Linen", "Summer", "Stripe"],
+      exchangeType: "swap",
     ),
   ];
 

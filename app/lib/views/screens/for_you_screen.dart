@@ -10,8 +10,9 @@ import '../../models/listing.dart';
 class _ListingCard extends StatelessWidget {
   final Listing listing;
   final BrowseViewModel vm;
+  final VoidCallback? onTap;
 
-  const _ListingCard({required this.listing, required this.vm});
+  const _ListingCard({required this.listing, required this.vm, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +20,7 @@ class _ListingCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final mutedText = isDark ? colorScheme.onSurface.withOpacity(0.70) : AppTheme.mutedForeground;
     return GestureDetector(
-      onTap: () => Navigator.of(context).pushNamed('/item/${listing.id}'),
+      onTap: onTap,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -199,6 +200,11 @@ class ForYouScreen extends StatelessWidget {
               child: Consumer<BrowseViewModel>(
                 builder: (context, vm, _) {
                   // Use the same filter/search UI as Browse
+                  final filteredItems = vm.forYouRecommendations.where((item) {
+                    final searchLower = vm.search.toLowerCase();
+                    return item.name.toLowerCase().contains(searchLower) ||
+                        item.category.toLowerCase().contains(searchLower);
+                  }).toList();
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -248,7 +254,7 @@ class ForYouScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                if (vm.forYouRecommendations.isEmpty)
+                                if (filteredItems.isEmpty)
                                   Center(
                                     child: Padding(
                                       padding: const EdgeInsets.only(top: 48),
@@ -289,12 +295,17 @@ class ForYouScreen extends StatelessWidget {
                                           crossAxisSpacing: 12,
                                           mainAxisSpacing: 12,
                                         ),
-                                    itemCount: vm.forYouRecommendations.length,
-                                    itemBuilder: (context, index) =>
-                                        _ListingCard(
-                                          listing: vm.forYouRecommendations[index],
-                                          vm: vm,
-                                        ),
+                                    itemCount: filteredItems.length,
+                                    itemBuilder: (context, index) => _ListingCard(
+                                      listing: filteredItems[index],
+                                      vm: vm,
+                                      onTap: () {
+                                        Navigator.of(context).pushNamed(
+                                          '/item/${filteredItems[index].id}',
+                                          arguments: filteredItems[index],
+                                        );
+                                      },
+                                    ),
                                   ),
                                 const SizedBox(height: 12),
                               ],

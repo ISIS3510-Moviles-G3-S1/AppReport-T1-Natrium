@@ -119,6 +119,7 @@ class BrowseViewModel extends ChangeNotifier {
     _sort = v;
     notifyListeners();
   }
+    Map<int, bool> get savedItems => _savedItems;
 
   bool get aiSearch => _aiSearch;
   set aiSearch(bool v) {

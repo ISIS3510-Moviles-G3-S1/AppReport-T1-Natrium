@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
 import '../../view_models/profile_view_model.dart';
+import '../../view_models/browse_view_model.dart';
 import '../../models/profile_models.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -304,6 +305,82 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ),
                 ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Text(
+                  'Favorites',
+                  style: Theme.of(context).textTheme.titleLarge ??
+                      const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Consumer<BrowseViewModel>(
+                builder: (context, browseVm, _) {
+                  final savedListings = browseVm.filteredAndSorted.where((l) => browseVm.isSaved(l.id)).toList();
+                  if (savedListings.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('No favorites yet.', style: TextStyle(color: AppTheme.mutedForeground)),
+                    );
+                  }
+                  return SizedBox(
+                    height: 180,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: savedListings.length,
+                      itemBuilder: (context, i) {
+                        final item = savedListings[i];
+                        return Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 12),
+                          child: Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => context.go('/item/${item.id}'),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: CachedNetworkImage(
+                                      imageUrl: item.image,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                        ),
+                                        Text(
+                                          '\$${item.price.toStringAsFixed(0)}',
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.sage),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               ),
             ),
             SliverToBoxAdapter(

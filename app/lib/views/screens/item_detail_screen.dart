@@ -190,7 +190,7 @@ class _InfoSection extends StatelessWidget {
               ),
             ),
             IconButton(
-              onPressed: vm.toggleSaved,
+              onPressed: () => vm.toggleSaved(context),
               icon: Icon(
                 vm.saved
                     ? Icons.favorite
@@ -418,7 +418,7 @@ class _InfoSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: vm.toggleSaved,
+                onPressed: () => vm.toggleSaved(context),
                 icon: Icon(
                   vm.saved ? Icons.favorite : Icons.favorite_border_outlined,
                   size: 18,

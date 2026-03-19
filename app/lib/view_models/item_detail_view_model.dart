@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/widgets.dart';
+import '../view_models/browse_view_model.dart';
 import '../models/item_detail.dart';
 import '../data/mock_data.dart';
 
@@ -31,9 +34,13 @@ class ItemDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleSaved() {
-    _saved = !_saved;
-    notifyListeners();
+  void toggleSaved(BuildContext context) {
+    if (_item != null) {
+      final browseVM = Provider.of<BrowseViewModel>(context, listen: false);
+      browseVM.toggleSave(_item!.id);
+      _saved = browseVM.savedItems[_item!.id] ?? false;
+      notifyListeners();
+    }
   }
 
   void sendMessage() {
