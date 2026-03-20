@@ -1,42 +1,16 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+abstract class NotificationService {
+  factory NotificationService() => const DummyNotificationService();
 
-class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
+  Future<void> initialize();
+  Future<void> showInactivityNotification();
+}
 
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+class DummyNotificationService implements NotificationService {
+  const DummyNotificationService();
 
-  Future<void> initialize() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+  @override
+  Future<void> initialize() async {}
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
-
-  Future<void> showInactivityNotification() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'inactivity_channel',
-      'Inactivity Notifications',
-      channelDescription: 'Notifications for user inactivity',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: false,
-    );
-
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await _flutterLocalNotificationsPlugin.show(
-      0,
-      'Welcome back!',
-      'It\'s been a while since your last visit. Check out new listings!',
-      platformChannelSpecifics,
-    );
-  }
+  @override
+  Future<void> showInactivityNotification() async {}
 }

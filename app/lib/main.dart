@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +16,46 @@ import 'view_models/profile_view_model.dart';
 import 'view_models/sell_view_model.dart';
 import 'view_models/session_view_model.dart';
 
+class RealNotificationService implements NotificationService {
+  late FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
+
+  @override
+  Future<void> initialize() async {
+    _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  @override
+  Future<void> showInactivityNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'inactivity_channel',
+      'Inactivity Notifications',
+      channelDescription: 'Notifications for user inactivity',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: false,
+    );
+
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await _flutterLocalNotificationsPlugin.show(
+      0,
+      'Welcome back!',
+      'It\'s been a while since your last visit. Check out new listings!',
+      platformChannelSpecifics,
+    );
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -23,16 +64,16 @@ Future<void> main() async {
   );
 
   // Initialize notifications
-  final notificationService = NotificationService();
+  final notificationService = RealNotificationService();
   await notificationService.initialize();
 
   runApp(UniMarketApp(notificationService: notificationService));
 }
 
 class UniMarketApp extends StatelessWidget {
-  const UniMarketApp({super.key, required this.notificationService});
+  const UniMarketApp({super.key, this.notificationService});
 
-  final NotificationService notificationService;
+  final NotificationService? notificationService;
 
   @override
   Widget build(BuildContext context) {
@@ -42,12 +83,13 @@ class UniMarketApp extends StatelessWidget {
 
         Provider(create: (_) => AuthService()),
 
-        Provider<NotificationService>.value(value: notificationService),
+        if (notificationService != null)
+          Provider<NotificationService>.value(value: notificationService!),
 
         ChangeNotifierProvider(
           create: (context) => SessionViewModel(
             authService: context.read<AuthService>(),
-            notificationService: context.read<NotificationService>(),
+            notificationService: notificationService,
           ),
         ),
 

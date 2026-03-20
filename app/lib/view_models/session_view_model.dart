@@ -13,7 +13,7 @@ class SessionViewModel extends ChangeNotifier {
     required AuthService authService,
     NotificationService? notificationService,
   })  : _authService = authService,
-        _notificationService = notificationService ?? NotificationService() {
+        _notificationService = notificationService ?? const DummyNotificationService() {
     _authSubscription = _authService.authStateChanges.listen(
       (user) => _handleAuthState(user),
       onError: (_, __) {
@@ -51,6 +51,15 @@ class SessionViewModel extends ChangeNotifier {
         email: email,
         password: password,
       );
+
+      // Check inactivity before updating lastLogin
+      final shouldNotify = await _authService.shouldNotifyForInactivity(user.uid, 5);
+      if (shouldNotify) {
+        await _notificationService.showInactivityNotification();
+      }
+
+      // Update lastLogin after checking
+      await _authService.updateLastLogin(user.uid);
 
       _setUser(user);
 

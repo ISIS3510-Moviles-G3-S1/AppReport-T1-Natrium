@@ -26,7 +26,6 @@ class AuthService {
         password: password,
       );
       final user = await _hydrateUser(credential.user!);
-      await _updateLastLogin(user.uid);
       return user;
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebaseException(e);
@@ -127,7 +126,7 @@ class AuthService {
     return AppUser.fromFirebaseUser(firebaseUser);
   }
 
-  Future<void> _updateLastLogin(String uid) async {
+  Future<void> updateLastLogin(String uid) async {
     await _firestore.collection('users').doc(uid).update({
       'lastLogin': FieldValue.serverTimestamp(),
     });
@@ -153,6 +152,21 @@ class AuthService {
   Future<bool> isInactiveForDays(String uid, int days) async {
     final lastLogin = await getLastLogin(uid);
     final daysSince = daysSinceLastLogin(lastLogin);
-    return daysSince != null && daysSince > days;
+    return daysSince != null && daysSince >= days;
+  }
+
+  Future<bool> shouldNotifyForInactivity(String uid, int days) async {
+    final lastLogin = await getLastLogin(uid);
+    final daysSince = daysSinceLastLogin(lastLogin);
+    
+    print('DEBUG: lastLogin = $lastLogin');
+    print('DEBUG: days inactive = $daysSince');
+    
+    final shouldNotify = daysSince != null && daysSince > days;
+    if (shouldNotify) {
+      print('DEBUG: Triggering inactivity notification');
+    }
+    
+    return shouldNotify;
   }
 }

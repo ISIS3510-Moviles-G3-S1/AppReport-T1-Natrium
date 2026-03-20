@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uni_market/main.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   testWidgets('App boots', (WidgetTester tester) async {
     await tester.pumpWidget(const UniMarketApp());
     // Avoid pumpAndSettle here: the app has ongoing animations/image loading
