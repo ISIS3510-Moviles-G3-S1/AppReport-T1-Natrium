@@ -1,13 +1,26 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'core/app_router.dart';
-import 'core/theme/theme_context.dart';
-import 'view_models/home_view_model.dart';
-import 'view_models/browse_view_model.dart';
-import 'view_models/sell_view_model.dart';
-import 'view_models/profile_view_model.dart';
 
-void main() {
+import 'firebase_options.dart';
+
+import 'core/app_router.dart';
+import 'core/auth_service.dart';
+import 'core/theme/theme_context.dart';
+import 'view_models/browse_view_model.dart';
+import 'view_models/home_view_model.dart';
+import 'view_models/profile_view_model.dart';
+import 'view_models/sell_view_model.dart';
+import 'view_models/session_view_model.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const UniMarketApp());
 }
 
@@ -18,25 +31,36 @@ class UniMarketApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // [Strategy Pattern] — ThemeContext is the "context" object.
-        // It holds the currently active ThemeStrategy and notifies the
-        // widget tree whenever the strategy — and therefore the theme — changes.
-        // Registered first so other providers can read it if needed.
         ChangeNotifierProvider(create: (_) => ThemeContext()),
+
+        Provider(create: (_) => AuthService()),
+
+        ChangeNotifierProvider(
+          create: (context) => SessionViewModel(
+            authService: context.read<AuthService>(),
+          ),
+        ),
+
+        ChangeNotifierProxyProvider<SessionViewModel, ProfileViewModel>(
+          create: (context) =>
+              ProfileViewModel(context.read<SessionViewModel>()),
+          update: (_, session, previous) =>
+              previous ?? ProfileViewModel(session),
+        ),
+
         ChangeNotifierProvider(create: (_) => HomeViewModel()),
         ChangeNotifierProvider(create: (_) => BrowseViewModel()),
         ChangeNotifierProvider(create: (_) => SellViewModel()),
-        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
+
+        ProxyProvider<SessionViewModel, GoRouter>(
+          update: (_, session, __) => createAppRouter(session),
+        ),
       ],
-      // Consumer<ThemeContext> rebuilds only this subtree when the theme
-      // changes, keeping all other providers and their subtrees unaffected.
-      child: Consumer<ThemeContext>(
-        builder: (context, themeCtx, _) => MaterialApp.router(
+      child: Consumer2<ThemeContext, GoRouter>(
+        builder: (context, themeCtx, router, _) => MaterialApp.router(
           title: 'UniMarket',
-          // Delegate theme resolution entirely to the active strategy.
-          // The context calls themeCtx.currentTheme → strategy.getTheme().
           theme: themeCtx.currentTheme,
-          routerConfig: createAppRouter(),
+          routerConfig: router,
         ),
       ),
     );

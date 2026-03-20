@@ -1,43 +1,75 @@
 import 'package:flutter/foundation.dart';
+
+import '../models/app_user.dart';
 import '../models/profile_models.dart';
-import '../data/mock_data.dart';
+import 'session_view_model.dart';
 
 class ProfileViewModel extends ChangeNotifier {
-  List<MyListing> _listings = List.from(MockData.myListings);
-
-  int get xp => MockData.profileXp;
-  String get profileName => MockData.profileName;
-  String get profileSince => MockData.profileSince;
-  String get profileUniversity => MockData.profileUniversity;
-  double get profileRating => MockData.profileRating;
-  int get profileTransactions => MockData.profileTransactions;
-  String get profileAvatar => MockData.profileAvatar;
-
-  List<ProfileBadge> get badges => MockData.badges;
-  List<ActivityItem> get activityFeed => MockData.activityFeed;
-  List<MyListing> get listings => _listings;
-
-  Level get currentLevel {
-    final eligible = MockData.levels.where((l) => xp >= l.minXp).toList();
-    return eligible.isEmpty ? MockData.levels.first : eligible.last;
+  ProfileViewModel(this._session) {
+    _session.addListener(_forwardSessionChanges);
   }
 
-  Level? get nextLevel {
-    for (final l in MockData.levels) {
-      if (l.minXp > xp) return l;
+  final SessionViewModel _session;
+
+  AppUser? get _user => _session.currentUser;
+
+  int get xp => 0;
+
+  String get profileName {
+    final user = _user;
+    if (user == null) return '';
+    final name = user.displayName;
+    if (name != null && name.trim().isNotEmpty) {
+      return name.trim();
     }
-    return null;
+    final email = user.email;
+    if (email != null && email.isNotEmpty) {
+      return email.split('@').first;
+    }
+    return 'User';
   }
 
-  double get levelProgress {
-    final next = nextLevel;
-    if (next == null) return 100;
-    final current = currentLevel;
-    return ((xp - current.minXp) / (next.minXp - current.minXp)) * 100;
+  String get profileSince {
+    final since = _user?.createdAt;
+    if (since == null) return '';
+    final month = since.month.toString().padLeft(2, '0');
+    return '$month/${since.year}';
   }
 
-  void deleteListing(int id) {
-    _listings = _listings.where((l) => l.id != id).toList();
-    notifyListeners();
+  String get profileUniversity {
+    final email = _user?.email ?? '';
+    final parts = email.split('@');
+    if (parts.length == 2) {
+      return parts[1];
+    }
+    return '';
+  }
+
+  double get profileRating => 0;
+
+  int get profileTransactions => 0;
+
+  String get profileAvatar => '';
+
+  List<ProfileBadge> get badges => const [];
+
+  List<ActivityItem> get activityFeed => const [];
+
+  List<MyListing> get listings => const [];
+
+  Level get currentLevel => const Level(level: 1, name: 'Newcomer', minXp: 0);
+
+  Level? get nextLevel => null;
+
+  double get levelProgress => 0;
+
+  void deleteListing(int id) {}
+
+  void _forwardSessionChanges() => notifyListeners();
+
+  @override
+  void dispose() {
+    _session.removeListener(_forwardSessionChanges);
+    super.dispose();
   }
 }

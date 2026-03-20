@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "900978890680",
+    "project_id": "unimarket-e3282",
+    "storage_bucket": "unimarket-e3282.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:900978890680:android:2f20fc11b64bb29f35214d",
+        "android_client_info": {
+          "package_name": "com.unimarket.uni_market"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAwKjRI0aw1BosgoleBtyHVTiuguknt_M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

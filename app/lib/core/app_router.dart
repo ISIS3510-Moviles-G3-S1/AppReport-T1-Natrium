@@ -1,32 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../views/screens/home_screen.dart';
-import '../views/screens/browse_screen.dart';
-import '../views/screens/item_detail_screen.dart';
-import '../views/screens/sell_screen.dart';
-import '../views/screens/profile_screen.dart';
-import '../views/screens/activity_listings_screen.dart';
-import '../views/screens/not_found_screen.dart';
-import '../views/screens/swap_screen.dart';
-import '../views/screens/donate_screen.dart';
-import '../views/widgets/main_shell.dart';
-import '../view_models/item_detail_view_model.dart';
 import 'package:provider/provider.dart';
-//import 'package:provider/provider.dart';
+
+// Screens
+import 'package:uni_market/views/screens/home_screen.dart';
+import 'package:uni_market/views/screens/browse_screen.dart';
+import 'package:uni_market/views/screens/item_detail_screen.dart';
+import 'package:uni_market/views/screens/sell_screen.dart';
+import 'package:uni_market/views/screens/profile_screen.dart';
+import 'package:uni_market/views/screens/activity_listings_screen.dart';
+import 'package:uni_market/views/screens/not_found_screen.dart';
+import 'package:uni_market/views/screens/swap_screen.dart';
+import 'package:uni_market/views/screens/donate_screen.dart';
+import 'package:uni_market/views/screens/login_screen.dart';
+
+// Widgets
+import 'package:uni_market/views/widgets/main_shell.dart';
+
+// ViewModels
+import 'package:uni_market/view_models/item_detail_view_model.dart';
+import 'package:uni_market/view_models/session_view_model.dart';
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter(SessionViewModel session) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
+    refreshListenable: session,
+
+    redirect: (context, state) {
+      final isLoading = session.isLoading;
+      final isAuth = session.isAuthenticated;
+
+      final isLoadingRoute = state.matchedLocation == '/loading';
+      final isLoginRoute = state.matchedLocation == '/login';
+
+      if (isLoading && !isLoadingRoute) return '/loading';
+
+      if (!isAuth && !isLoginRoute) return '/login';
+
+      if (isAuth && (isLoginRoute || isLoadingRoute)) return '/';
+
+      return null;
+    },
+
     errorBuilder: (_, __) => const NotFoundScreen(),
+
     routes: [
+      /// LOADING
+      GoRoute(
+        path: '/loading',
+        builder: (_, __) =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+      ),
+
+      GoRoute(
+        path: '/login',
+        builder: (_, __) => const LoginScreen(),
+      ),
+
+      /// MAIN APP (TABS)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             MainShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
                 path: '/',
@@ -36,7 +75,6 @@ GoRouter createAppRouter() {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
                 path: '/browse',
@@ -46,7 +84,6 @@ GoRouter createAppRouter() {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
                 path: '/sell',
@@ -56,7 +93,6 @@ GoRouter createAppRouter() {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
                 path: '/activity-listings',
@@ -66,7 +102,6 @@ GoRouter createAppRouter() {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
                 path: '/profile',
@@ -77,6 +112,8 @@ GoRouter createAppRouter() {
           ),
         ],
       ),
+
+      /// ITEM DETAIL
       GoRoute(
         path: '/item/:id',
         parentNavigatorKey: _rootNavigatorKey,
@@ -88,11 +125,15 @@ GoRouter createAppRouter() {
           );
         },
       ),
+
+      /// SWAP
       GoRoute(
         path: '/swap',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SwapScreen(),
       ),
+
+      /// DONATE
       GoRoute(
         path: '/donate',
         parentNavigatorKey: _rootNavigatorKey,
