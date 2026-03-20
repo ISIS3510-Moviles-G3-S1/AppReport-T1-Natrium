@@ -25,7 +25,9 @@ class AuthService {
         email: email,
         password: password,
       );
-      return await _hydrateUser(credential.user!);
+      final user = await _hydrateUser(credential.user!);
+      await _updateLastLogin(user.uid);
+      return user;
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebaseException(e);
     } catch (_) {
@@ -66,7 +68,7 @@ class AuthService {
       'ratingStars': 0,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    
+
     final doc = await docRef.get();
     return AppUser.fromFirestore(doc);
 
@@ -123,5 +125,34 @@ class AuthService {
     }
 
     return AppUser.fromFirebaseUser(firebaseUser);
+  }
+
+  Future<void> _updateLastLogin(String uid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'lastLogin': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<DateTime?> getLastLogin(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    if (doc.exists) {
+      final data = doc.data();
+      final timestamp = data?['lastLogin'] as Timestamp?;
+      return timestamp?.toDate();
+    }
+    return null;
+  }
+
+  int? daysSinceLastLogin(DateTime? lastLogin) {
+    if (lastLogin == null) return null;
+    final now = DateTime.now();
+    final difference = now.difference(lastLogin);
+    return difference.inDays;
+  }
+
+  Future<bool> isInactiveForDays(String uid, int days) async {
+    final lastLogin = await getLastLogin(uid);
+    final daysSince = daysSinceLastLogin(lastLogin);
+    return daysSince != null && daysSince > days;
   }
 }

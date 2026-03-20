@@ -5,11 +5,15 @@ import 'package:flutter/foundation.dart';
 
 import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
+import '../core/notification_service.dart';
 import '../models/app_user.dart';
 
 class SessionViewModel extends ChangeNotifier {
-  SessionViewModel({required AuthService authService})
-      : _authService = authService {
+  SessionViewModel({
+    required AuthService authService,
+    NotificationService? notificationService,
+  })  : _authService = authService,
+        _notificationService = notificationService ?? NotificationService() {
     _authSubscription = _authService.authStateChanges.listen(
       (user) => _handleAuthState(user),
       onError: (_, __) {
@@ -20,6 +24,7 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   final AuthService _authService;
+  final NotificationService _notificationService;
   StreamSubscription<User?>? _authSubscription;
 
   AppUser? _currentUser;
@@ -131,6 +136,8 @@ class SessionViewModel extends ChangeNotifier {
 
       if (_currentUser?.uid != user.uid) {
         _setUser(user);
+        // Check inactivity on login/app start
+        await _checkInactivity(user.uid);
       }
 
     } on AuthFailure catch (failure) {
@@ -143,8 +150,18 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   /// =========================
-  /// STATE HELPERS
+  /// INACTIVITY CHECK
   /// =========================
+  Future<void> _checkInactivity(String uid) async {
+    try {
+      final isInactive = await _authService.isInactiveForDays(uid, 5);
+      if (isInactive) {
+        await _notificationService.showInactivityNotification();
+      }
+    } catch (_) {
+      // Silently fail for inactivity check
+    }
+  }
   void _setUser(AppUser? user) {
     _currentUser = user;
     notifyListeners();
