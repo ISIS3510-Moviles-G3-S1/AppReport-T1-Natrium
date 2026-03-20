@@ -39,10 +39,7 @@ class SessionViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      final user =
-          await _authService.signIn(email: email, password: password);
-      _setUser(user);
-      _setLoading(false);
+      await _authService.signIn(email: email, password: password);
     } on AuthFailure catch (failure) {
       _setError(failure.message);
       _setLoading(false);
@@ -64,13 +61,11 @@ class SessionViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      final user = await _authService.signUp(
+      await _authService.signUp(
         email: email,
         password: password,
         displayName: displayName,
       );
-      _setUser(user);
-      _setLoading(false);
     } on AuthFailure catch (failure) {
       _setError(failure.message);
       _setLoading(false);
@@ -88,8 +83,6 @@ class SessionViewModel extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.signOut();
-      _setUser(null);
-      _setLoading(false);
     } on AuthFailure catch (failure) {
       _setError(failure.message);
       _setLoading(false);

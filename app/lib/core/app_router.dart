@@ -28,23 +28,28 @@ GoRouter createAppRouter(SessionViewModel session) {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: session,
-
     redirect: (context, state) {
+      final location =
+          state.matchedLocation.isEmpty ? state.uri.path : state.matchedLocation;
       final isLoading = session.isLoading;
       final isAuth = session.isAuthenticated;
+      final onLoading = location == '/loading';
+      final onLogin = location == '/login';
 
-      final isLoadingRoute = state.matchedLocation == '/loading';
-      final isLoginRoute = state.matchedLocation == '/login';
+      if (isLoading) {
+        return onLoading ? null : '/loading';
+      }
 
-      if (isLoading && !isLoadingRoute) return '/loading';
+      if (!isAuth) {
+        return onLogin ? null : '/login';
+      }
 
-      if (!isAuth && !isLoginRoute) return '/login';
-
-      if (isAuth && (isLoginRoute || isLoadingRoute)) return '/';
+      if (onLogin || onLoading) {
+        return '/';
+      }
 
       return null;
     },
-
     errorBuilder: (_, __) => const NotFoundScreen(),
 
     routes: [
