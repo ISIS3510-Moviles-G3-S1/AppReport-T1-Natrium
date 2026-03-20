@@ -3,21 +3,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class AppUser {
   final String uid;
-  final String? email;
-  final String? displayName;
-  final String? profilePic;
+  final String email;
+  final String displayName;
+  final String profilePic;
   final int xpPoints;
-
   final bool isVerified;
   final int numTransactions;
   final int ratingStars;
   final DateTime? createdAt;
 
-  AppUser({
+  const AppUser({
     required this.uid,
-    this.email,
-    this.displayName,
-    this.profilePic,
+    required this.email,
+    required this.displayName,
+    required this.profilePic,
     this.xpPoints = 0,
     this.isVerified = false,
     this.numTransactions = 0,
@@ -26,30 +25,31 @@ class AppUser {
   });
 
   factory AppUser.fromFirebaseUser(User user) {
+    final email = user.email ?? '';
     return AppUser(
       uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      profilePic: user.photoURL,
+      email: email,
+      displayName: user.displayName ?? email.split('@').first,
+      profilePic: user.photoURL ?? '',
+      xpPoints: 0,
+      isVerified: user.emailVerified,
+      numTransactions: 0,
+      ratingStars: 0,
+      createdAt: user.metadata.creationTime,
     );
   }
 
   factory AppUser.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
-
-    if (data == null) {
-      return AppUser(uid: doc.id);
-    }
-
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return AppUser(
-      uid: data['uid'] ?? doc.id,
-      email: data['email'] as String?,
-      displayName: data['displayName'] as String?,
-      profilePic: data['profilePic'] as String?,
-      xpPoints: (data['xpPoints'] ?? 0) as int,
-      isVerified: (data['isVerified'] ?? false) as bool,
-      numTransactions: (data['numTransactions'] ?? 0) as int,
-      ratingStars: (data['ratingStars'] ?? 0) as int,
+      uid: (data['uid'] as String?) ?? doc.id,
+      email: (data['email'] as String?) ?? '',
+      displayName: (data['displayName'] as String?) ?? '',
+      profilePic: (data['profilePic'] as String?) ?? '',
+      xpPoints: (data['xpPoints'] as num?)?.toInt() ?? 0,
+      isVerified: (data['isVerified'] as bool?) ?? false,
+      numTransactions: (data['numTransactions'] as num?)?.toInt() ?? 0,
+      ratingStars: (data['ratingStars'] as num?)?.toInt() ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }

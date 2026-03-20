@@ -1,144 +1,143 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
 import '../models/app_user.dart';
 
 class SessionViewModel extends ChangeNotifier {
   SessionViewModel({required AuthService authService})
       : _authService = authService {
-    _authSubscription =
-        _authService.authStateChanges.listen(_onAuthStateChanged);
+    _authSubscription = _authService.authStateChanges.listen(
+      (user) => _handleAuthState(user),
+      onError: (_, __) {
+        _setError('Session error. Please try again');
+        _setLoading(false);
+      },
+    );
   }
 
   final AuthService _authService;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   StreamSubscription<User?>? _authSubscription;
 
   AppUser? _currentUser;
   bool _isLoading = true;
+  String? _errorMessage;
 
-  // =========================
-  // GETTERS
-  // =========================
   AppUser? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
-
-  // =========================
-  // AUTH ACTIONS
-  // =========================
-
-  Future<void> register({
-    required String email,
-    required String password,
-    String? displayName,
-  }) async {
-    _setLoading(true);
-
-    await _authService.register(
-      email: email,
-      password: password,
-      displayName: displayName,
-    );
-
-    // ❌ NO tocar estado aquí
-    // Firebase listener se encarga
-  }
+  String? get errorMessage => _errorMessage;
 
   Future<void> signIn({
     required String email,
     required String password,
   }) async {
     _setLoading(true);
+    _setError(null);
 
-    await _authService.signIn(
-      email: email,
-      password: password,
-    );
+    try {
+      final user =
+          await _authService.signIn(email: email, password: password);
+      _setUser(user);
+      _setLoading(false);
+    } on AuthFailure catch (failure) {
+      _setError(failure.message);
+      _setLoading(false);
+      rethrow;
+    } catch (_) {
+      const failure = AuthFailure('Unable to sign in. Please try again');
+      _setError(failure.message);
+      _setLoading(false);
+      throw failure;
+    }
+  }
 
-    // ❌ NO tocar estado aquí
+  Future<void> signUp({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      final user = await _authService.signUp(
+        email: email,
+        password: password,
+        displayName: displayName,
+      );
+      _setUser(user);
+      _setLoading(false);
+    } on AuthFailure catch (failure) {
+      _setError(failure.message);
+      _setLoading(false);
+      rethrow;
+    } catch (_) {
+      const failure = AuthFailure('Unable to sign up. Please try again');
+      _setError(failure.message);
+      _setLoading(false);
+      throw failure;
+    }
   }
 
   Future<void> signOut() async {
     _setLoading(true);
-    await _authService.signOut();
+    _setError(null);
+    try {
+      await _authService.signOut();
+      _setUser(null);
+      _setLoading(false);
+    } on AuthFailure catch (failure) {
+      _setError(failure.message);
+      _setLoading(false);
+      rethrow;
+    } catch (_) {
+      const failure = AuthFailure('Unable to sign out. Please try again');
+      _setError(failure.message);
+      _setLoading(false);
+      throw failure;
+    }
   }
 
-  // =========================
-  // AUTH LISTENER (CORE)
-  // =========================
-
-  void _onAuthStateChanged(User? firebaseUser) {
+  Future<void> _handleAuthState(User? firebaseUser) async {
     if (firebaseUser == null) {
-      _currentUser = null;
-      _isLoading = false;
-      notifyListeners();
+      _setUser(null);
+      _setLoading(false);
       return;
     }
 
-    // 🔥 1. Autenticación inmediata (NO bloquea UI)
-    _currentUser = AppUser.fromFirebaseUser(firebaseUser);
-    _isLoading = false;
-    notifyListeners();
-
-    // 🔄 2. Firestore en background
-    _loadUserFromFirestore(firebaseUser.uid);
-  }
-
-  // =========================
-  // FIRESTORE USER LOAD
-  // =========================
-
-  Future<void> _loadUserFromFirestore(String uid) async {
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-
-      if (doc.exists) {
-        _currentUser = AppUser.fromFirestore(doc);
-        notifyListeners();
-      } else {
-        // 🔥 opcional: crear usuario automáticamente
-        await _createUserInFirestore(uid);
-      }
-    } catch (e) {
-      debugPrint('Firestore user load error: $e');
+      final user = await _authService.hydrateUser(firebaseUser);
+      _setUser(user);
+    } on AuthFailure catch (failure) {
+      _setError(failure.message);
+    } catch (_) {
+      _setError('Unable to refresh session. Please try again');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> _createUserInFirestore(String uid) async {
-    if (_currentUser == null) return;
-
-    final user = _currentUser!;
-
-    final data = {
-      'uid': user.uid,
-      'email': user.email,
-      'displayName': user.displayName ?? '',
-      'profilePic': user.profilePic ?? '',
-      'xpPoints': user.xpPoints ?? 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
-    await _firestore.collection('users').doc(uid).set(data);
+  void _setUser(AppUser? user) {
+    if (_currentUser == user) return;
+    _currentUser = user;
+    notifyListeners();
   }
 
-  // =========================
-  // HELPERS
-  // =========================
-
   void _setLoading(bool value) {
+    if (_isLoading == value) return;
     _isLoading = value;
     notifyListeners();
   }
 
-  // =========================
-  // CLEANUP
-  // =========================
+  void _setError(String? message) {
+    if (_errorMessage == message) return;
+    _errorMessage = message;
+    notifyListeners();
+  }
 
   @override
   void dispose() {

@@ -13,20 +13,16 @@ class ProfileViewModel extends ChangeNotifier {
 
   AppUser? get _user => _session.currentUser;
 
-  int get xp => 0;
+  int get xp => _user?.xpPoints ?? 0;
 
   String get profileName {
     final user = _user;
     if (user == null) return '';
-    final name = user.displayName;
-    if (name != null && name.trim().isNotEmpty) {
-      return name.trim();
+    final name = user.displayName.trim();
+    if (name.isNotEmpty) {
+      return name;
     }
-    final email = user.email;
-    if (email != null && email.isNotEmpty) {
-      return email.split('@').first;
-    }
-    return 'User';
+    return user.email.split('@').first;
   }
 
   String get profileSince {
@@ -45,11 +41,11 @@ class ProfileViewModel extends ChangeNotifier {
     return '';
   }
 
-  double get profileRating => 0;
+  double get profileRating => (_user?.ratingStars ?? 0).toDouble();
 
-  int get profileTransactions => 0;
+  int get profileTransactions => _user?.numTransactions ?? 0;
 
-  String get profileAvatar => '';
+  String get profileAvatar => _user?.profilePic ?? '';
 
   List<ProfileBadge> get badges => const [];
 
