@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
 import '../../view_models/home_view_model.dart';
+import '../../view_models/session_view_model.dart';
 import '../../models/listing.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -65,7 +66,42 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Consumer<SessionViewModel>(
+                          builder: (context, session, _) => SizedBox(
+                            height: 34,
+                            child: OutlinedButton.icon(
+                              onPressed: session.isLoading
+                                  ? null
+                                  : () async {
+                                      await session.signOut();
+                                    },
+                              icon: session.isLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.logout_rounded, size: 18),
+                              label: const Text('Log out', style: TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.deepGreen,
+                                side: BorderSide(color: AppTheme.deepGreen.withOpacity(0.5)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                minimumSize: const Size(88, 34),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       Image.asset(
                         'assets/images/uni_market_logo.png',
                         height: 90,

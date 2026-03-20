@@ -31,6 +31,9 @@ class SessionViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// =========================
+  /// SIGN IN
+  /// =========================
   Future<void> signIn({
     required String email,
     required String password,
@@ -39,19 +42,28 @@ class SessionViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      await _authService.signIn(email: email, password: password);
+      final user = await _authService.signIn(
+        email: email,
+        password: password,
+      );
+
+      _setUser(user);
+
     } on AuthFailure catch (failure) {
       _setError(failure.message);
-      _setLoading(false);
       rethrow;
     } catch (_) {
       const failure = AuthFailure('Unable to sign in. Please try again');
       _setError(failure.message);
-      _setLoading(false);
       throw failure;
+    } finally {
+      _setLoading(false);
     }
   }
 
+  /// =========================
+  /// SIGN UP
+  /// =========================
   Future<void> signUp({
     required String email,
     required String password,
@@ -61,40 +73,52 @@ class SessionViewModel extends ChangeNotifier {
     _setError(null);
 
     try {
-      await _authService.signUp(
+      final user = await _authService.signUp(
         email: email,
         password: password,
         displayName: displayName,
       );
+
+      _setUser(user);
+
     } on AuthFailure catch (failure) {
       _setError(failure.message);
-      _setLoading(false);
       rethrow;
     } catch (_) {
       const failure = AuthFailure('Unable to sign up. Please try again');
       _setError(failure.message);
-      _setLoading(false);
       throw failure;
+    } finally {
+      _setLoading(false);
     }
   }
 
+  /// =========================
+  /// SIGN OUT
+  /// =========================
   Future<void> signOut() async {
     _setLoading(true);
     _setError(null);
+
     try {
       await _authService.signOut();
+      _setUser(null);
+
     } on AuthFailure catch (failure) {
       _setError(failure.message);
-      _setLoading(false);
       rethrow;
     } catch (_) {
       const failure = AuthFailure('Unable to sign out. Please try again');
       _setError(failure.message);
-      _setLoading(false);
       throw failure;
+    } finally {
+      _setLoading(false);
     }
   }
 
+  /// =========================
+  /// AUTH STATE LISTENER
+  /// =========================
   Future<void> _handleAuthState(User? firebaseUser) async {
     if (firebaseUser == null) {
       _setUser(null);
@@ -104,7 +128,11 @@ class SessionViewModel extends ChangeNotifier {
 
     try {
       final user = await _authService.hydrateUser(firebaseUser);
-      _setUser(user);
+
+      if (_currentUser?.uid != user.uid) {
+        _setUser(user);
+      }
+
     } on AuthFailure catch (failure) {
       _setError(failure.message);
     } catch (_) {
@@ -114,8 +142,10 @@ class SessionViewModel extends ChangeNotifier {
     }
   }
 
+  /// =========================
+  /// STATE HELPERS
+  /// =========================
   void _setUser(AppUser? user) {
-    if (_currentUser == user) return;
     _currentUser = user;
     notifyListeners();
   }
@@ -127,7 +157,6 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   void _setError(String? message) {
-    if (_errorMessage == message) return;
     _errorMessage = message;
     notifyListeners();
   }
