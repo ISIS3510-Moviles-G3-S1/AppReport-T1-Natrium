@@ -5,11 +5,15 @@ import 'package:flutter/foundation.dart';
 
 import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
+import '../core/notification_service.dart';
 import '../models/app_user.dart';
 
 class SessionViewModel extends ChangeNotifier {
-  SessionViewModel({required AuthService authService})
-      : _authService = authService {
+  SessionViewModel({
+    required AuthService authService,
+    required NotificationService notificationService,
+  })  : _authService = authService,
+        _notificationService = notificationService {
     _authSubscription = _authService.authStateChanges.listen(
       (user) => _handleAuthState(user),
       onError: (_, __) {
@@ -20,6 +24,7 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   final AuthService _authService;
+  final NotificationService _notificationService;
   StreamSubscription<User?>? _authSubscription;
 
   AppUser? _currentUser;
@@ -47,8 +52,25 @@ class SessionViewModel extends ChangeNotifier {
         password: password,
       );
 
-      _setUser(user);
+      // Check inactivity BEFORE updating lastLogin
+      final isInactive = await _authService.isInactiveForDays(
+        user.uid,
+        days: 3,
+      );
 
+      // If user is inactive, show notification
+      if (isInactive) {
+        await _notificationService.showNotification(
+          title: 'We miss you!',
+          body: 'New items are waiting for you 👀',
+        );
+        debugPrint('[SessionViewModel] Inactivity notification sent');
+      }
+
+      // Update lastLogin timestamp
+      await _authService.updateLastLogin(user.uid);
+
+      _setUser(user);
     } on AuthFailure catch (failure) {
       _setError(failure.message);
       rethrow;

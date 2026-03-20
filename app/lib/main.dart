@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 
 import 'core/app_router.dart';
 import 'core/auth_service.dart';
+import 'core/notification_service.dart';
 import 'core/theme/theme_context.dart';
 import 'view_models/browse_view_model.dart';
 import 'view_models/home_view_model.dart';
@@ -21,11 +22,21 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const UniMarketApp());
+  // Initialize notification service
+  final notificationService = RealNotificationService();
+  await notificationService.initialize();
+  await notificationService.requestNotificationPermission();
+
+  runApp(UniMarketApp(notificationService: notificationService));
 }
 
 class UniMarketApp extends StatelessWidget {
-  const UniMarketApp({super.key});
+  final NotificationService notificationService;
+
+  const UniMarketApp({
+    super.key,
+    required this.notificationService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +46,12 @@ class UniMarketApp extends StatelessWidget {
 
         Provider(create: (_) => AuthService()),
 
+        Provider<NotificationService>(create: (_) => notificationService),
+
         ChangeNotifierProvider(
           create: (context) => SessionViewModel(
             authService: context.read<AuthService>(),
+            notificationService: context.read<NotificationService>(),
           ),
         ),
 

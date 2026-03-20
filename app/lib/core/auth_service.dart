@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_user.dart';
 import 'auth_failure.dart';
@@ -65,6 +67,7 @@ class AuthService {
       'numTransactions': 0,
       'ratingStars': 0,
       'createdAt': FieldValue.serverTimestamp(),
+      'lastLogin': FieldValue.serverTimestamp(),
     });
     
     final doc = await docRef.get();
@@ -115,6 +118,7 @@ class AuthService {
       'numTransactions': 0,
       'ratingStars': 0,
       'createdAt': FieldValue.serverTimestamp(),
+      'lastLogin': FieldValue.serverTimestamp(),
     });
 
     final createdDoc = await docRef.get();
@@ -124,4 +128,70 @@ class AuthService {
 
     return AppUser.fromFirebaseUser(firebaseUser);
   }
+
+  /// Update lastLogin timestamp for user in Firestore and SharedPreferences
+  Future<void> updateLastLogin(String uid) async {
+    try {
+      final now = DateTime.now();
+
+      // Update in Firestore
+      await _firestore.collection('users').doc(uid).update({
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
+
+      // Save to local SharedPreferences for quick access
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('lastLogin_$uid', now.toIso8601String());
+
+      debugPrint('[AuthService] Updated lastLogin for user $uid');
+    } catch (e) {
+      debugPrint('[AuthService] Error updating lastLogin: $e');
+    }
+  }
+
+  /// Check if user is inactive for specified number of days
+  /// Returns true if user hasn't logged in for >= days
+  Future<bool> isInactiveForDays(String uid, {int days = 3}) async {
+    try {
+      // Try to get lastLogin from SharedPreferences first (faster)
+      final prefs = await SharedPreferences.getInstance();
+      final lastLoginStr = prefs.getString('lastLogin_$uid');
+
+      DateTime? lastLogin;
+
+      if (lastLoginStr != null) {
+        lastLogin = DateTime.parse(lastLoginStr);
+      } else {
+        // Fallback: fetch from Firestore
+        final doc = await _firestore.collection('users').doc(uid).get();
+        if (doc.exists) {
+          final data = doc.data() ?? <String, dynamic>{};
+          final timestamp = data['lastLogin'];
+          if (timestamp is Timestamp) {
+            lastLogin = timestamp.toDate();
+          }
+        }
+      }
+
+      // If no lastLogin found, user is not inactive (first login)
+      if (lastLogin == null) {
+        debugPrint('[AuthService] No lastLogin found for user $uid');
+        return false;
+      }
+
+      // Check if user is inactive
+      final now = DateTime.now();
+      final daysSinceLogin = now.difference(lastLogin).inDays;
+      final isInactive = daysSinceLogin >= days;
+
+      debugPrint(
+          '[AuthService] User $uid - Days since login: $daysSinceLogin (Inactive: $isInactive)');
+
+      return isInactive;
+    } catch (e) {
+      debugPrint('[AuthService] Error checking inactivity: $e');
+      return false;
+    }
+  }
 }
+
