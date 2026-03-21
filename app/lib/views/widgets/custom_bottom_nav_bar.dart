@@ -23,7 +23,7 @@ class CustomBottomNavBar extends StatelessWidget {
           context.go('/browse');
           break;
         case 2:
-          context.go('/swap');
+          // context.go('/swap');
           break;
         case 3:
           context.go('/sell');

@@ -265,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => context.go('/donate'),
+                                  onPressed: null,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.deepGreen,
                                   side: BorderSide(color: pillBorder),
@@ -292,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => context.go('/swap'),
+                                  onPressed: null,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.deepGreen,
                                   side: BorderSide(color: pillBorder),

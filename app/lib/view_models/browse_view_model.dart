@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/listing.dart';
 import '../data/listing_service.dart';
-import 'dart:collection';
+
 
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
+import '../core/ai_recommendation_decorator.dart';
 
 class BrowseViewModel extends ChangeNotifier {
   List<Listing> _listings = [];
@@ -87,8 +88,22 @@ class BrowseViewModel extends ChangeNotifier {
     _updateRecommendationService();
   }
 
-  // 'For You' recommendations
+
+  // 'For You' recommendations (sin IA, síncrono)
   List<Listing> get forYouRecommendations => _recommendationService.getRecommendations();
+
+  // 'For You' recomendaciones IA (asíncrono)
+  Future<List<Listing>> getForYouAIRecommendations() async {
+    final base = AllItemsRecommendation(_listings);
+    final tagFiltered = TagFilterDecorator(base, _categoryInteractionCounts.keys.toList());
+    final newPriority = NewItemPriorityDecorator(tagFiltered, DateTime.now().subtract(Duration(days: 5)), _itemUploadDates);
+    final ai = AIRecommendationDecorator(
+      newPriority,
+      apiUrl: 'http://localhost:8000/recommend', // Cambia por la IP de tu PC si usas dispositivo físico
+      userId: 'demo-user',
+    );
+    return await ai.getRecommendedItems();
+  }
 
   // New item counts per frequent category
   Map<String, int> get forYouNewItemCounts => _recommendationService.getNewItemCounts();

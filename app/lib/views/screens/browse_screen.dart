@@ -26,9 +26,12 @@ class BrowseScreen extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Responsive top padding for tab bar
+                SizedBox(height: MediaQuery.of(context).size.height * 0.04),
                 // Top tab bar
                 Container(
                   color: colorScheme.surface,
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: MediaQuery.of(context).size.height * 0.01),
                   child: Row(
                     children: [
                       Expanded(

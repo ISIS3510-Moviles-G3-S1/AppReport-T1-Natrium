@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 /// Light listing for browse grid and home featured.
 class Listing {
+    Map<String, dynamic> toJson() => toFirestore();
   final String id;
   final String sellerId;
   final String title;

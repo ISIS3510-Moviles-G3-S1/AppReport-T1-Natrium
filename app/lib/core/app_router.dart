@@ -10,8 +10,6 @@ import '../views/screens/sell_screen.dart';
 import '../views/screens/profile_screen.dart';
 import '../views/screens/activity_listings_screen.dart';
 import '../views/screens/not_found_screen.dart';
-import '../views/screens/swap_screen.dart';
-import '../views/screens/donate_screen.dart';
 import '../views/screens/login_screen.dart';
 import '../views/screens/register_screen.dart';
 
@@ -137,32 +135,9 @@ GoRouter createAppRouter(SessionViewModel session) {
         ],
       ),
 
-      /// ITEM DETAIL
-      GoRoute(
-        path: '/item/:id',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return ChangeNotifierProvider(
-            create: (_) => ItemDetailViewModel()..loadItem(id),
-            child: const ItemDetailScreen(),
-          );
-        },
-      ),
+      // Removed swap and donate routes
 
-      /// SWAP
-      GoRoute(
-        path: '/swap',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const SwapScreen(),
-      ),
-
-      /// DONATE
-      GoRoute(
-        path: '/donate',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const DonateScreen(),
-      ),
+      // Rutas swap y donate eliminadas
     ],
   );
 }
