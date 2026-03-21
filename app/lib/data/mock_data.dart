@@ -6,58 +6,68 @@ import '../models/profile_models.dart';
 class MockData {
   static final featuredListings = [
     Listing(
-      id: 1,
-      name: "Vintage Levi's Denim Jacket",
+      id: '1',
+      sellerId: 'seller1',
+      title: "Vintage Levi's Denim Jacket",
       price: 25,
-      condition: "Good",
-      seller: "Sofia R.",
+      conditionTag: "Good",
+      description: "Vintage Levi's denim jacket in good condition",
+      sellerName: "Sofia R.",
       rating: 4.8,
-      image:
-          "https://images.unsplash.com/photo-1601333144130-8cbb312386b6?w=400&h=500&fit=crop",
+      imageName: 'denim_jacket.jpg',
+      imagePath: "https://images.unsplash.com/photo-1601333144130-8cbb312386b6?w=400&h=500&fit=crop",
       saved: false,
     ),
     Listing(
-      id: 2,
-      name: "Floral Summer Dress",
+      id: '2',
+      sellerId: 'seller2',
+      title: "Floral Summer Dress",
       price: 18,
-      condition: "Like New",
-      seller: "Maria G.",
+      conditionTag: "Like New",
+      description: "Beautiful floral summer dress",
+      sellerName: "Maria G.",
       rating: 5.0,
-      image:
-          "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=500&fit=crop",
+      imageName: 'floral_dress.jpg',
+      imagePath: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&h=500&fit=crop",
       saved: true,
     ),
     Listing(
-      id: 3,
-      name: "Cream Knit Sweater",
+      id: '3',
+      sellerId: 'seller3',
+      title: "Cream Knit Sweater",
       price: 20,
-      condition: "Good",
-      seller: "Emma T.",
+      conditionTag: "Good",
+      description: "Cozy cream knit sweater",
+      sellerName: "Emma T.",
       rating: 4.6,
-      image:
-          "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&h=500&fit=crop",
+      imageName: 'knit_sweater.jpg',
+      imagePath: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&h=500&fit=crop",
       saved: false,
     ),
     Listing(
-      id: 4,
-      name: "Black Slim Trousers",
+      id: '4',
+      sellerId: 'seller4',
+      title: "Black Slim Trousers",
       price: 15,
-      condition: "Fair",
-      seller: "Ana L.",
+      conditionTag: "Fair",
+      description: "Black slim trousers in fair condition",
+      sellerName: "Ana L.",
       rating: 4.3,
-      image:
-          "https://images.unsplash.com/photo-1594938298603-c8148c4b4086?w=400&h=500&fit=crop",
+      imageName: 'black_trousers.jpg',
+      imagePath: "https://images.unsplash.com/photo-1594938298603-c8148c4b4086?w=400&h=500&fit=crop",
       saved: false,
     ),
     Listing(
-      id: 5,
-      name: "Puffer Winter Jacket",
+      id: '5',
+      sellerId: 'seller5',
+      title: "Puffer Winter Jacket",
       price: 40,
-      condition: "Like New",
-      seller: "Laura P.",
+      conditionTag: "Like New",
+      description: "Warm puffer winter jacket",
+      sellerName: "Laura P.",
       rating: 4.9,
-      image:
-          "https://images.unsplash.com/photo-1548126032-079a0fb0099d?w=400&h=500&fit=crop",
+      imageName: 'puffer_jacket.jpg',
+      imagePath: "https://images.unsplash.com/photo-1548126032-079a0fb0099d?w=400&h=500&fit=crop",
       saved: false,
     ),
   ];
@@ -65,27 +75,17 @@ class MockData {
   static final browseListings = [
     ...featuredListings,
     Listing(
-      id: 6,
-      name: "Silk Blouse Ivory",
+      id: '6',
+      sellerId: 'seller6',
+      title: "Silk Blouse Ivory",
       price: 22,
-      condition: "Good",
-      seller: "Chloe M.",
-      rating: 4.7,
-      image:
-          "https://images.unsplash.com/photo-1485518882345-15568b007407?w=400&h=500&fit=crop",
-      // MockData eliminado. Usar ListingService para manejar los listings en Firebase.
-      // Removed deprecated fields
-      seller: Seller(
-        name: "Chloe M.",
-        university: "UPM Madrid",
-        rating: 4.7,
-        sales: 8,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Chloe",
-        verified: true,
-      ),
-      aiScore: 90,
+      conditionTag: "Good",
       description: "Elegant silk blouse in ivory. Perfect for evening events or formal occasions. No stains, gently used.",
-      images: [
+      sellerName: "Chloe M.",
+      rating: 4.7,
+      imageName: 'silk_blouse.jpg',
+      imagePath: "https://images.unsplash.com/photo-1485518882345-15568b007407?w=400&h=500&fit=crop",
+      imageURLs: [
         "https://images.unsplash.com/photo-1485518882345-15568b007407?w=600&h=700&fit=crop",
         "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
         "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
@@ -95,9 +95,9 @@ class MockData {
     ),
     // 7. Canvas Tote Bag
     ItemDetail(
-      id: 7,
+      id: '7',
       name: "Canvas Tote Bag",
-      price: 10,
+      price: 10.0,
       condition: "Like New",
       seller: Seller(
         name: "Ines R.",
@@ -115,13 +115,12 @@ class MockData {
         "https://images.unsplash.com/photo-1544816155-12df9643f363?w=300&h=300&fit=crop",
       ],
       tags: ["Eco", "Casual", "Bag"],
-      exchangeType: "donate",
     ),
     // 8. High-Waist Jeans
     ItemDetail(
-      id: 8,
+      id: '8',
       name: "High-Waist Jeans",
-      price: 28,
+      price: 28.0,
       condition: "Good",
       seller: Seller(
         name: "Nora B.",
@@ -139,13 +138,12 @@ class MockData {
         "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop",
       ],
       tags: ["Denim", "Casual", "Classic"],
-      exchangeType: "sell",
     ),
     // 9. Striped Linen Shirt
     ItemDetail(
-      id: 9,
+      id: '9',
       name: "Striped Linen Shirt",
-      price: 16,
+      price: 16.0,
       condition: "Good",
       seller: Seller(
         name: "Kai O.",
@@ -163,38 +161,89 @@ class MockData {
         "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=300&h=300&fit=crop",
       ],
       tags: ["Linen", "Summer", "Stripe"],
-      exchangeType: "swap",
     ),
   ];
 
   static final similarItems = [
-    (
-      id: 3,
+    ItemDetail(
+      id: '3',
       name: "Cream Knit Sweater",
       price: 20.0,
-      image:
-          "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=300&h=300&fit=crop",
+      condition: "Good",
+      seller: Seller(
+        name: "Emma T.",
+        university: "UPM Madrid",
+        rating: 4.6,
+        sales: 5,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
+        verified: true,
+      ),
+      aiScore: 87,
+      description: "Cozy cream knit sweater",
+      images: [
+        "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=300&h=300&fit=crop",
+      ],
+      tags: ["Knit", "Winter", "Cozy"],
     ),
-    (
-      id: 5,
+    ItemDetail(
+      id: '5',
       name: "Puffer Winter Jacket",
       price: 40.0,
-      image:
-          "https://images.unsplash.com/photo-1548126032-079a0fb0099d?w=300&h=300&fit=crop",
+      condition: "Like New",
+      seller: Seller(
+        name: "Laura P.",
+        university: "Complutense",
+        rating: 4.9,
+        sales: 12,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Laura",
+        verified: true,
+      ),
+      aiScore: 92,
+      description: "Warm puffer winter jacket",
+      images: [
+        "https://images.unsplash.com/photo-1548126032-079a0fb0099d?w=300&h=300&fit=crop",
+      ],
+      tags: ["Winter", "Puffer", "Warm"],
     ),
-    (
-      id: 6,
+    ItemDetail(
+      id: '6',
       name: "Silk Blouse Ivory",
       price: 22.0,
-      image:
-          "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
+      condition: "Good",
+      seller: Seller(
+        name: "Chloe M.",
+        university: "UPM Madrid",
+        rating: 4.7,
+        sales: 8,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Chloe",
+        verified: true,
+      ),
+      aiScore: 90,
+      description: "Elegant silk blouse in ivory",
+      images: [
+        "https://images.unsplash.com/photo-1485518882345-15568b007407?w=300&h=300&fit=crop",
+      ],
+      tags: ["Silk", "Elegant", "Evening"],
     ),
-    (
-      id: 8,
+    ItemDetail(
+      id: '8',
       name: "High-Waist Jeans",
       price: 28.0,
-      image:
-          "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop",
+      condition: "Good",
+      seller: Seller(
+        name: "Nora B.",
+        university: "UAM",
+        rating: 4.4,
+        sales: 6,
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nora",
+        verified: false,
+      ),
+      aiScore: 85,
+      description: "Classic high-waist jeans",
+      images: [
+        "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300&h=300&fit=crop",
+      ],
+      tags: ["Denim", "Casual", "Classic"],
     ),
   ];
 

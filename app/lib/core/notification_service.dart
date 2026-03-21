@@ -9,6 +9,9 @@ abstract class NotificationService {
   /// Request notification permissions from user
   Future<bool> requestNotificationPermission();
 
+  /// Check if notification permissions are granted
+  Future<bool> arePermissionsGranted();
+
   /// Show a local notification
   Future<void> showNotification({
     required String title,
@@ -47,6 +50,12 @@ class RealNotificationService implements NotificationService {
   @override
   Future<bool> requestNotificationPermission() async {
     final status = await Permission.notification.request();
+    return status.isGranted;
+  }
+
+  @override
+  Future<bool> arePermissionsGranted() async {
+    final status = await Permission.notification.status;
     return status.isGranted;
   }
 
@@ -109,6 +118,12 @@ class DummyNotificationService implements NotificationService {
   Future<bool> requestNotificationPermission() async {
     debugPrint('DummyNotificationService: permission granted (fake)');
     return true;
+  }
+
+  @override
+  Future<bool> arePermissionsGranted() async {
+    final status = await Permission.notification.status;
+    return status.isGranted;
   }
 
   @override

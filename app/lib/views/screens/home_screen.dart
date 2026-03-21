@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -7,8 +9,68 @@ import '../../view_models/home_view_model.dart';
 import '../../view_models/session_view_model.dart';
 import '../../models/listing.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _inactivityDialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check for inactivity when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkInactivity();
+    });
+  }
+
+  Future<void> _checkInactivity() async {
+    if (_inactivityDialogShown) return;
+
+    final sessionVM = context.read<SessionViewModel>();
+    if (sessionVM.currentUser != null) {
+      try {
+        final isInactive = await sessionVM.checkInactivity(days: 3);
+
+        if (isInactive && mounted) {
+          _showInactivityDialog();
+          _inactivityDialogShown = true;
+        }
+      } catch (e) {
+        debugPrint('Error checking inactivity: $e');
+      }
+    }
+  }
+
+  void _showInactivityDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¡Te extrañamos! 👀'),
+        content: const Text(
+          'Han pasado unos días desde tu última visita. '
+          '¡Hay nuevos artículos esperándote!'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/browse');
+            },
+            child: const Text('Ver artículos'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

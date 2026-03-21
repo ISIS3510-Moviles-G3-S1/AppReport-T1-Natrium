@@ -25,7 +25,11 @@ Future<void> main() async {
   // Initialize notification service
   final notificationService = RealNotificationService();
   await notificationService.initialize();
-  await notificationService.requestNotificationPermission();
+  final permissionGranted = await notificationService.requestNotificationPermission();
+  debugPrint('[Main] Notification permission granted: $permissionGranted');
+
+  final areGranted = await notificationService.arePermissionsGranted();
+  debugPrint('[Main] Notification permissions are granted: $areGranted');
 
   runApp(UniMarketApp(notificationService: notificationService));
 }

@@ -139,6 +139,20 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   /// =========================
+  /// INACTIVITY CHECK
+  /// =========================
+  Future<bool> checkInactivity({int days = 3}) async {
+    if (currentUser == null) return false;
+
+    try {
+      return await _authService.isInactiveForDays(currentUser!.uid, days: days);
+    } catch (e) {
+      debugPrint('Error checking inactivity: $e');
+      return false;
+    }
+  }
+
+  /// =========================
   /// AUTH STATE LISTENER
   /// =========================
   Future<void> _handleAuthState(User? firebaseUser) async {
