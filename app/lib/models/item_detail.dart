@@ -3,6 +3,7 @@ import 'seller.dart';
 /// Full item for detail page (gallery, seller, AI score, etc.).
 class ItemDetail {
   final String id;
+  final String sellerId;
   final String name;
   final double price;
   final String condition;
@@ -15,6 +16,7 @@ class ItemDetail {
 
   const ItemDetail({
     required this.id,
+    required this.sellerId,
     required this.name,
     required this.price,
     required this.condition,

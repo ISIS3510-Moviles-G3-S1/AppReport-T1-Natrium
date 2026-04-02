@@ -386,6 +386,12 @@
       "languageVersion": "3.2"
     },
     {
+      "name": "mobile_scanner",
+      "rootUri": "file:///C:/Users/Sofia%20Toro/AppData/Local/Pub/Cache/hosted/pub.dev/mobile_scanner-6.0.11",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "nested",
       "rootUri": "file:///C:/Users/Sofia%20Toro/AppData/Local/Pub/Cache/hosted/pub.dev/nested-1.0.0",
       "packageUri": "lib/",
@@ -504,6 +510,18 @@
       "rootUri": "file:///C:/Users/Sofia%20Toro/AppData/Local/Pub/Cache/hosted/pub.dev/provider-6.1.5+1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "qr",
+      "rootUri": "file:///C:/Users/Sofia%20Toro/AppData/Local/Pub/Cache/hosted/pub.dev/qr-3.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "qr_flutter",
+      "rootUri": "file:///C:/Users/Sofia%20Toro/AppData/Local/Pub/Cache/hosted/pub.dev/qr_flutter-4.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
     },
     {
       "name": "rxdart",
@@ -686,7 +704,7 @@
       "languageVersion": "3.7"
     }
   ],
-  "generated": "2026-04-02T16:49:48.066652Z",
+  "generated": "2026-04-02T20:50:43.280466Z",
   "generator": "pub",
   "generatorVersion": "3.7.2",
   "flutterRoot": "file:///C:/flutter",
