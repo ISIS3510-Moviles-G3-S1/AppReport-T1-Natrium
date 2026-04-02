@@ -69,42 +69,51 @@ class _InitialState extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Center(
+    return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.checkroom_rounded, size: 72, color: scheme.primary),
-              const SizedBox(height: 20),
-              Text(
-                'Analyze a clothing item',
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center,
+          constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height - 48),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.checkroom_rounded, size: 72, color: scheme.primary),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Analyze a clothing item',
+                    style: theme.textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Take a photo or pick one from your gallery to generate editable tags.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 28),
+                  FilledButton.icon(
+                    onPressed: onTakePhoto,
+                    icon: const Icon(Icons.photo_camera_rounded),
+                    label: const Text('Take Photo'),
+                    style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: onChooseGallery,
+                    icon: const Icon(Icons.photo_library_rounded),
+                    label: const Text('Choose from Gallery'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      foregroundColor: scheme.onSurface,
+                      side: BorderSide(color: Colors.grey[400] ?? Colors.grey),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Take a photo or pick one from your gallery to generate editable tags.',
-                style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: onTakePhoto,
-                icon: const Icon(Icons.photo_camera_rounded),
-                label: const Text('Take Photo'),
-                style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: onChooseGallery,
-                icon: const Icon(Icons.photo_library_rounded),
-                label: const Text('Choose from Gallery'),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
-              ),
-            ],
+            ),
           ),
         ),
       ),
