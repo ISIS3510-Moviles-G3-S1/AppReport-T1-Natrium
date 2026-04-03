@@ -7,6 +7,18 @@ import 'package:image_picker/image_picker.dart';
 import '../models/listing.dart';
 
 class ListingService {
+    /// Returns the DateTime of the last post (listing) by this seller, or null if none.
+    Future<DateTime?> getLastPostDate(String sellerId) async {
+      final query = await _db
+          .collection(_collection)
+          .where('sellerId', isEqualTo: sellerId)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+      if (query.docs.isEmpty) return null;
+      final listing = Listing.fromFirestore(query.docs.first);
+      return listing.createdAt;
+    }
   final _db = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
   final _collection = 'listings';

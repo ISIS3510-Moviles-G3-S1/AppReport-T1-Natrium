@@ -7,8 +7,29 @@ import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
 import '../core/notification_service.dart';
 import '../models/app_user.dart';
+import '../data/listing_service.dart';
 
 class SessionViewModel extends ChangeNotifier {
+    /// Notifica si el usuario lleva más de 15 días sin hacer un post o nunca ha hecho un post
+    Future<void> checkPostInactivityAndNotify() async {
+      if (currentUser == null) return;
+      final lastPostDate = await ListingService().getLastPostDate(currentUser!.uid);
+      if (lastPostDate == null) {
+        await _notificationService.showNotification(
+          title: '¡Publica tu primer artículo!',
+          body: 'Aún no has publicado ningún artículo. ¡Anímate a publicar tu primer artículo hoy!',
+        );
+        return;
+      }
+
+      final daysSinceLastPost = DateTime.now().difference(lastPostDate).inDays;
+      if (daysSinceLastPost >= 15) {
+        await _notificationService.showNotification(
+          title: '¡Te extrañamos!',
+          body: 'Hace más de $daysSinceLastPost días que no publicas un artículo. ¡Publica uno nuevo hoy!',
+        );
+      }
+    }
   SessionViewModel({
     required AuthService authService,
     required NotificationService notificationService,
@@ -52,20 +73,17 @@ class SessionViewModel extends ChangeNotifier {
         password: password,
       );
 
-      // Check inactivity BEFORE updating lastLogin
-      final isInactive = await _authService.isInactiveForDays(
-        user.uid,
-        days: 3,
-      );
-
-      // If user is inactive, show notification
+      // Notifica si lleva más de 3 días sin iniciar sesión
+      final isInactive = await checkInactivity(days: 3);
       if (isInactive) {
         await _notificationService.showNotification(
-          title: 'We miss you!',
-          body: 'New items are waiting for you 👀',
+          title: '¡Te extrañamos!',
+          body: 'Hace más de 3 días que no inicias sesión. ¡Vuelve a UniMarket!',
         );
-        debugPrint('[SessionViewModel] Inactivity notification sent');
       }
+
+      // Notifica si lleva más de 15 días sin postear
+      await checkPostInactivityAndNotify();
 
       // Update lastLogin timestamp
       await _authService.updateLastLogin(user.uid);
