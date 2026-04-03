@@ -367,13 +367,18 @@ class _PhotoUpload extends StatelessWidget {
 
 
 
-  Future<void> _pickImages(BuildContext context) async {
+  Future<XFile?> _pickImages(BuildContext context) async {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
-    if (remaining <= 0) return;
+    if (remaining <= 0) return null;
     final pickedFiles = await picker.pickMultiImage(imageQuality: 85);
-    if (pickedFiles == null || pickedFiles.isEmpty) return;
+    if (pickedFiles == null || pickedFiles.isEmpty) return null;
     final filesToAdd = pickedFiles.take(remaining).toList();
+    // If called for retake, return the first picked image
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return filesToAdd.first;
+    }
+    // Otherwise, add all images as usual
     for (final file in filesToAdd) {
       await Navigator.push(
         context,
@@ -382,26 +387,63 @@ class _PhotoUpload extends StatelessWidget {
             photo: file,
             sourceType: PhotoSourceType.gallery,
             onRetake: (ctx) async {
-              Navigator.of(ctx).pop();
-              await _pickImages(ctx);
+              final picked = await _pickImages(ctx);
+              if (picked != null) {
+                Navigator.of(ctx).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => PhotoAnalysisScreen(
+                      photo: picked,
+                      sourceType: PhotoSourceType.gallery,
+                      onRetake: (ctx2) async {
+                        final picked2 = await _pickImages(ctx2);
+                        if (picked2 != null) {
+                          Navigator.of(ctx2).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => PhotoAnalysisScreen(
+                                photo: picked2,
+                                sourceType: PhotoSourceType.gallery,
+                                onRetake: (ctx3) async {},
+                                onKeep: () {
+                                  vm.addImage(picked2);
+                                  Navigator.of(ctx2).popUntil((route) => route.isFirst || route.settings.name == '/');
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      onKeep: () {
+                        vm.addImage(picked);
+                        Navigator.of(ctx).popUntil((route) => route.isFirst || route.settings.name == '/');
+                      },
+                    ),
+                  ),
+                );
+              }
             },
             onKeep: () {
               vm.addImage(file);
-              Navigator.of(context).pop();
+              Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/');
             },
           ),
         ),
       );
       if (vm.images.length >= 5) break;
     }
+    return null;
   }
 
-  Future<void> _takePhoto(BuildContext context) async {
+  Future<XFile?> _takePhoto(BuildContext context) async {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
-    if (remaining <= 0) return;
+    if (remaining <= 0) return null;
     final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-    if (photo == null) return;
+    if (photo == null) return null;
+    // If called for retake, return the photo
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return photo;
+    }
+    // Otherwise, add as usual
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -409,16 +451,48 @@ class _PhotoUpload extends StatelessWidget {
           photo: photo,
           sourceType: PhotoSourceType.camera,
           onRetake: (ctx) async {
-            Navigator.of(ctx).pop();
-            await _takePhoto(ctx);
+            final retaken = await _takePhoto(ctx);
+            if (retaken != null) {
+              Navigator.of(ctx).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => PhotoAnalysisScreen(
+                    photo: retaken,
+                    sourceType: PhotoSourceType.camera,
+                    onRetake: (ctx2) async {
+                      final retaken2 = await _takePhoto(ctx2);
+                      if (retaken2 != null) {
+                        Navigator.of(ctx2).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => PhotoAnalysisScreen(
+                              photo: retaken2,
+                              sourceType: PhotoSourceType.camera,
+                              onRetake: (ctx3) async {},
+                              onKeep: () {
+                                vm.addImage(retaken2);
+                                Navigator.of(ctx2).popUntil((route) => route.isFirst || route.settings.name == '/');
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    onKeep: () {
+                      vm.addImage(retaken);
+                      Navigator.of(ctx).popUntil((route) => route.isFirst || route.settings.name == '/');
+                    },
+                  ),
+                ),
+              );
+            }
           },
           onKeep: () {
             vm.addImage(photo);
-            Navigator.of(context).pop();
+            Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/');
           },
         ),
       ),
     );
+    return null;
   }
 
   @override
