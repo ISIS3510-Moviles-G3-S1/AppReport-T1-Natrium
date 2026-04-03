@@ -377,15 +377,9 @@ class _PhotoUpload extends StatelessWidget {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
     if (remaining <= 0) return;
-    List<XFile> newPhotos = [];
-    for (int i = 0; i < remaining; i++) {
-      final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-      if (photo == null) break;
-      newPhotos.add(photo);
-      // Opcional: preguntar si quiere tomar otra, aquí solo sigue hasta el límite
-    }
-    if (newPhotos.isNotEmpty) {
-      vm.setImages(newPhotos);
+    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    if (photo != null) {
+      vm.setImages([photo]);
     }
   }
 
