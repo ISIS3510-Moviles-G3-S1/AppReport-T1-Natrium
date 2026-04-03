@@ -196,7 +196,8 @@ class _SellForm extends StatelessWidget {
                     if (result != null) {
                       vm.applyAnalysisTags(result.tags);
                       if (result.analyzedImage != null && (vm.images.isEmpty || vm.images.first.path != result.analyzedImage?.path)) {
-                        await vm.setImagesWithQualityCheck(context, [result.analyzedImage!]);
+                        final keep = await vm.analyzeAndPromptPhoto(context, result.analyzedImage!);
+                        if (keep) vm.addImage(result.analyzedImage!);
                       }
                     }
                   },
@@ -370,17 +371,25 @@ class _PhotoUpload extends StatelessWidget {
     if (pickedFiles == null || pickedFiles.isEmpty) return;
     final filesToAdd = pickedFiles.take(remaining).toList();
     debugPrint('[SellScreen] picked: ${filesToAdd.map((x) => x.name).join(', ')}');
-    await vm.setImagesWithQualityCheck(context, filesToAdd);
+    for (final file in filesToAdd) {
+      final keep = await vm.analyzeAndPromptPhoto(context, file);
+      if (keep) vm.addImage(file);
+      if (vm.images.length >= 5) break;
+    }
   }
 
   Future<void> _takePhoto(BuildContext context) async {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
     if (remaining <= 0) return;
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
-    if (photo != null) {
-      await vm.setImagesWithQualityCheck(context, [photo]);
-    }
+    XFile? photo;
+    bool keep = false;
+    do {
+      photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+      if (photo == null) return;
+      keep = await vm.analyzeAndPromptPhoto(context, photo);
+    } while (!keep);
+    vm.addImage(photo);
   }
 
   @override

@@ -97,42 +97,42 @@ class SellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setImagesWithQualityCheck(BuildContext context, List<XFile> files) async {
-    final updated = List<XFile>.from(_images);
-    for (final file in files) {
-      if (updated.length >= 5) break;
-      final result = await PhotoQualityAnalyzer.analyze(File(file.path));
-      if (result.qualityScore < 0.5) {
-        // Show warning dialog
-        await showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Photo Quality Warning'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('This photo may not be suitable:'),
-                const SizedBox(height: 8),
-                ...result.suggestions.map((s) => Text('• $s')),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
+  /// Returns true if the photo should be kept, false if retake is requested.
+  Future<bool> analyzeAndPromptPhoto(BuildContext context, XFile file) async {
+    final result = await PhotoQualityAnalyzer.analyze(File(file.path));
+    if (result.qualityScore < 0.5) {
+      final choice = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Photo Quality Warning'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('This photo may not be suitable:'),
+              const SizedBox(height: 8),
+              ...result.suggestions.map((s) => Text('• $s')),
             ],
           ),
-        );
-      } else {
-        updated.add(file);
-      }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Retake'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Keep'),
+            ),
+          ],
+        ),
+      );
+      return choice == true;
     }
-    _images = updated.take(5).toList();
-    debugPrint('[SellVM] selected images: ${_images.map((f) => f.name).join(', ')}');
-    notifyListeners();
+    return true;
   }
+
+  // (keep only one addImage method)
 
   void addImage(XFile file) {
     if (_images.length < 5) {
