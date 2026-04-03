@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
+import '../core/photo_quality_analyzer.dart';
+import 'package:flutter/material.dart';
 import '../data/listing_service.dart';
 import '../models/listing.dart';
 import 'session_view_model.dart';
@@ -95,12 +97,9 @@ class SellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setImages(List<XFile> files) {
-    final updated = List<XFile>.from(_images)..addAll(files);
-    _images = updated.take(5).toList();
-    debugPrint('[SellVM] selected images: ${_images.map((f) => f.name).join(', ')}');
-    notifyListeners();
-  }
+
+
+  // (keep only one addImage method)
 
   void addImage(XFile file) {
     if (_images.length < 5) {

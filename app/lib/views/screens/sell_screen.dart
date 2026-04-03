@@ -9,6 +9,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_theme.dart';
 import '../../views/screens/clothing_analysis_screen.dart';
+import '../../views/screens/photo_analysis_screen.dart';
+import '../../core/photo_quality_analyzer.dart';
+import '../../core/photo_quality_vision_service.dart';
 import '../../view_models/sell_view_model.dart';
 
 // For AnalysisResult_WithImage type
@@ -196,7 +199,8 @@ class _SellForm extends StatelessWidget {
                     if (result != null) {
                       vm.applyAnalysisTags(result.tags);
                       if (result.analyzedImage != null && (vm.images.isEmpty || vm.images.first.path != result.analyzedImage?.path)) {
-                        vm.setImages([result.analyzedImage!]);
+                        // Directly add the analyzed image, or add your own prompt here if needed
+                        vm.addImage(result.analyzedImage!);
                       }
                     }
                   },
@@ -361,12 +365,134 @@ class _PhotoUpload extends StatelessWidget {
 
   const _PhotoUpload({required this.vm});
 
-  Future<void> _pickImages(BuildContext context) async {
+
+
+  Future<XFile?> _pickImages(BuildContext context) async {
     final picker = ImagePicker();
+    final remaining = 5 - vm.images.length;
+    if (remaining <= 0) return null;
     final pickedFiles = await picker.pickMultiImage(imageQuality: 85);
-    if (pickedFiles == null || pickedFiles.isEmpty) return;
-    debugPrint('[SellScreen] picked: ${pickedFiles.map((x) => x.name).join(', ')}');
-    vm.setImages(pickedFiles);
+    if (pickedFiles == null || pickedFiles.isEmpty) return null;
+    final filesToAdd = pickedFiles.take(remaining).toList();
+    // If called for retake, return the first picked image
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return filesToAdd.first;
+    }
+    // Otherwise, add all images as usual
+    for (final file in filesToAdd) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PhotoAnalysisScreen(
+            photo: file,
+            sourceType: PhotoSourceType.gallery,
+            onRetake: (ctx) async {
+              final picked = await _pickImages(ctx);
+              if (picked != null) {
+                Navigator.of(ctx).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => PhotoAnalysisScreen(
+                      photo: picked,
+                      sourceType: PhotoSourceType.gallery,
+                      onRetake: (ctx2) async {
+                        final picked2 = await _pickImages(ctx2);
+                        if (picked2 != null) {
+                          Navigator.of(ctx2).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => PhotoAnalysisScreen(
+                                photo: picked2,
+                                sourceType: PhotoSourceType.gallery,
+                                onRetake: (ctx3) async {},
+                                onKeep: () {
+                                  vm.addImage(picked2);
+                                  Navigator.of(ctx2).popUntil((route) => route.isFirst || route.settings.name == '/');
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      onKeep: () {
+                        vm.addImage(picked);
+                        Navigator.of(ctx).popUntil((route) => route.isFirst || route.settings.name == '/');
+                      },
+                    ),
+                  ),
+                );
+              }
+            },
+            onKeep: () {
+              vm.addImage(file);
+              Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/');
+            },
+          ),
+        ),
+      );
+      if (vm.images.length >= 5) break;
+    }
+    return null;
+  }
+
+  Future<XFile?> _takePhoto(BuildContext context) async {
+    final picker = ImagePicker();
+    final remaining = 5 - vm.images.length;
+    if (remaining <= 0) return null;
+    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    if (photo == null) return null;
+    // If called for retake, return the photo
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      return photo;
+    }
+    // Otherwise, add as usual
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoAnalysisScreen(
+          photo: photo,
+          sourceType: PhotoSourceType.camera,
+          onRetake: (ctx) async {
+            final retaken = await _takePhoto(ctx);
+            if (retaken != null) {
+              Navigator.of(ctx).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => PhotoAnalysisScreen(
+                    photo: retaken,
+                    sourceType: PhotoSourceType.camera,
+                    onRetake: (ctx2) async {
+                      final retaken2 = await _takePhoto(ctx2);
+                      if (retaken2 != null) {
+                        Navigator.of(ctx2).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => PhotoAnalysisScreen(
+                              photo: retaken2,
+                              sourceType: PhotoSourceType.camera,
+                              onRetake: (ctx3) async {},
+                              onKeep: () {
+                                vm.addImage(retaken2);
+                                Navigator.of(ctx2).popUntil((route) => route.isFirst || route.settings.name == '/');
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    onKeep: () {
+                      vm.addImage(retaken);
+                      Navigator.of(ctx).popUntil((route) => route.isFirst || route.settings.name == '/');
+                    },
+                  ),
+                ),
+              );
+            }
+          },
+          onKeep: () {
+            vm.addImage(photo);
+            Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/');
+          },
+        ),
+      ),
+    );
+    return null;
   }
 
   @override
@@ -381,70 +507,68 @@ class _PhotoUpload extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: images.length >= 5 ? null : () => _pickImages(context),
+                icon: const Icon(Icons.photo_library_rounded),
+                label: Text('Gallery  ${images.length}/5'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  // No backgroundColor/foregroundColor: usa los del tema
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: images.length >= 5 ? null : () => _takePhoto(context),
+                icon: const Icon(Icons.camera_alt_rounded),
+                label: Text('Camera  ${images.length}/5'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  // No backgroundColor/foregroundColor: usa los del tema
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: List.generate(tileCount, (idx) {
-            if (idx < images.length) {
-              return SizedBox(
-                width: imageSize,
-                height: tileHeight,
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: _buildImagePreview(
-                        images[idx],
-                        width: imageSize,
-                        height: tileHeight,
-                      ),
+          children: List.generate(images.length, (idx) {
+            return SizedBox(
+              width: imageSize,
+              height: tileHeight,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: _buildImagePreview(
+                      images[idx],
+                      width: imageSize,
+                      height: tileHeight,
                     ),
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: GestureDetector(
-                        onTap: () => vm.removeImageAt(idx),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.close, color: Colors.white, size: 22),
+                  ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: () => vm.removeImageAt(idx),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(14),
                         ),
+                        child: const Icon(Icons.close, color: Colors.white, size: 22),
                       ),
                     ),
-                  ],
-                ),
-              );
-            }
-            return GestureDetector(
-              onTap: () => _pickImages(context),
-              child: Container(
-                width: addTileWidth,
-                height: tileHeight,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: colorScheme.primary, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_a_photo_rounded, size: 36, color: colorScheme.primary),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Add Photo',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.primary),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           }),
@@ -453,10 +577,10 @@ class _PhotoUpload extends StatelessWidget {
           padding: const EdgeInsets.only(top: 12),
           child: Row(
             children: [
-              Icon(Icons.camera_alt_rounded, size: 24, color: colorScheme.onSurface),
+              Icon(Icons.info_outline_rounded, size: 20, color: colorScheme.onSurface),
               const SizedBox(width: 8),
               Text(
-                'JPG, PNG, WEBP up to 10MB. Max 5 photos.',
+                'JPG, PNG, WEBP up to 10MB. Máx 5 photos.',
                 style: TextStyle(fontSize: 12, color: mutedText),
               ),
             ],
