@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
+import '../../core/chat_store.dart';
 import '../../view_models/item_detail_view_model.dart';
 import '../../models/item_detail.dart';
 import '../../models/seller.dart';
+import 'chat_thread_view.dart';
 
 class ItemDetailScreen extends StatelessWidget {
   const ItemDetailScreen({super.key});
@@ -429,14 +431,27 @@ class _InfoSection extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: vm.messageSent ? null : vm.sendMessage,
-                icon: Icon(
-                  vm.messageSent ? Icons.check_circle_outline : Icons.mail_outline,
+                onPressed: () {
+                  final chatStore = context.read<ChatStore>();
+                  final conversationId = chatStore.startConversation(
+                    productID: item.id.toString(),
+                    productTitle: item.name,
+                    sellerName: item.seller.name,
+                    productImageUrl: item.images.isNotEmpty
+                        ? item.images.first
+                        : 'uni_market_logo.png',
+                  );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChatThreadView(conversationId: conversationId),
+                    ),
+                  );
+                },
+                icon: const Icon(
+                  Icons.mail_outline,
                   size: 18,
                 ),
-                label: Text(
-                  vm.messageSent ? 'Message Sent!' : 'Message Seller',
-                ),
+                label: const Text('Message Seller'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: bodyTextColor,
                   side: BorderSide(color: borderColor),

@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
+import '../../core/chat_store.dart';
 import '../../view_models/home_view_model.dart';
 import '../../view_models/session_view_model.dart';
 import '../../models/listing.dart';
+import 'chat_inbox_view.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -24,10 +26,69 @@ class HomeScreen extends StatelessWidget {
           final featured = vm.featured;
           return CustomScrollView(
             slivers: [
+              SliverAppBar(
+                floating: true,
+                snap: true,
+                backgroundColor: isDark
+                    ? Theme.of(context).scaffoldBackgroundColor
+                    : AppTheme.background,
+                elevation: 0,
+                toolbarHeight: 56,
+                title: const Text('UniMarket'),
+                titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppTheme.foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+                actions: [
+                  Consumer<ChatStore>(
+                    builder: (context, chatStore, _) {
+                      final unreadCount = chatStore.totalUnreadCount;
+                      return Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.mail_outline),
+                            color: AppTheme.foreground,
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ChatInboxView(),
+                                ),
+                              );
+                            },
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppTheme.accent,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: AppTheme.white,
+                                        fontSize: 10,
+                                      ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
               SliverToBoxAdapter(
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 48, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   color:
                       isDark
                           ? Theme.of(context).scaffoldBackgroundColor
@@ -47,6 +108,77 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.eco_rounded,
+                              size: 14,
+                              color: AppTheme.accent,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Sustainable Fashion for Students',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.accent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Consumer<SessionViewModel>(
+                          builder: (context, session, _) => SizedBox(
+                            height: 34,
+                            child: OutlinedButton.icon(
+                              onPressed: session.isLoading
+                                  ? null
+                                  : () async {
+                                      await session.signOut();
+                                    },
+                              icon: const Icon(Icons.logout_rounded, size: 16),
+                              label: const Text('Logout'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: mutedText,
+                                side: BorderSide(color: pillBorder),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  color:
+                      isDark
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : AppTheme.background,
+                  child: Column(
+                    children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accent.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppTheme.accent.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
