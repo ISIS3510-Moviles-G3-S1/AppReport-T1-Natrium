@@ -5,11 +5,36 @@ import 'package:flutter/foundation.dart';
 
 import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
+import '../core/notification_service.dart';
 import '../models/app_user.dart';
+import '../data/listing_service.dart';
 
 class SessionViewModel extends ChangeNotifier {
-  SessionViewModel({required AuthService authService})
-      : _authService = authService {
+    /// Notifica si el usuario lleva más de 15 días sin hacer un post o nunca ha hecho un post
+    Future<void> checkPostInactivityAndNotify() async {
+      if (currentUser == null) return;
+      final lastPostDate = await ListingService().getLastPostDate(currentUser!.uid);
+      if (lastPostDate == null) {
+        await _notificationService.showNotification(
+          title: '¡Publica tu primer artículo!',
+          body: 'Aún no has publicado ningún artículo. ¡Anímate a publicar tu primer artículo hoy!',
+        );
+        return;
+      }
+
+      final daysSinceLastPost = DateTime.now().difference(lastPostDate).inDays;
+      if (daysSinceLastPost >= 15) {
+        await _notificationService.showNotification(
+          title: '¡Te extrañamos!',
+          body: 'Hace más de $daysSinceLastPost días que no publicas un artículo. ¡Publica uno nuevo hoy!',
+        );
+      }
+    }
+  SessionViewModel({
+    required AuthService authService,
+    required NotificationService notificationService,
+  })  : _authService = authService,
+        _notificationService = notificationService {
     _authSubscription = _authService.authStateChanges.listen(
       (user) => _handleAuthState(user),
       onError: (_, __) {
@@ -20,6 +45,7 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   final AuthService _authService;
+  final NotificationService _notificationService;
   StreamSubscription<User?>? _authSubscription;
 
   AppUser? _currentUser;
@@ -47,8 +73,22 @@ class SessionViewModel extends ChangeNotifier {
         password: password,
       );
 
-      _setUser(user);
+      // Notifica si lleva más de 3 días sin iniciar sesión
+      final isInactive = await checkInactivity(days: 3);
+      if (isInactive) {
+        await _notificationService.showNotification(
+          title: '¡Te extrañamos!',
+          body: 'Hace más de 3 días que no inicias sesión. ¡Vuelve a UniMarket!',
+        );
+      }
 
+      // Notifica si lleva más de 15 días sin postear
+      await checkPostInactivityAndNotify();
+
+      // Update lastLogin timestamp
+      await _authService.updateLastLogin(user.uid);
+
+      _setUser(user);
     } on AuthFailure catch (failure) {
       _setError(failure.message);
       rethrow;
@@ -113,6 +153,20 @@ class SessionViewModel extends ChangeNotifier {
       throw failure;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// =========================
+  /// INACTIVITY CHECK
+  /// =========================
+  Future<bool> checkInactivity({int days = 3}) async {
+    if (currentUser == null) return false;
+
+    try {
+      return await _authService.isInactiveForDays(currentUser!.uid, days: days);
+    } catch (e) {
+      debugPrint('Error checking inactivity: $e');
+      return false;
     }
   }
 

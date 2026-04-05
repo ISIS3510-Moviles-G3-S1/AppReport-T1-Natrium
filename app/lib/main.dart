@@ -22,11 +22,25 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const UniMarketApp());
+  // Initialize notification service
+  final notificationService = RealNotificationService();
+  await notificationService.initialize();
+  final permissionGranted = await notificationService.requestNotificationPermission();
+  debugPrint('[Main] Notification permission granted: $permissionGranted');
+
+  final areGranted = await notificationService.arePermissionsGranted();
+  debugPrint('[Main] Notification permissions are granted: $areGranted');
+
+  runApp(UniMarketApp(notificationService: notificationService));
 }
 
 class UniMarketApp extends StatelessWidget {
-  const UniMarketApp({super.key});
+  final NotificationService notificationService;
+
+  const UniMarketApp({
+    super.key,
+    required this.notificationService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +53,7 @@ class UniMarketApp extends StatelessWidget {
         ChangeNotifierProvider<SessionViewModel>(
           create: (context) => SessionViewModel(
             authService: context.read<AuthService>(),
+            notificationService: context.read<NotificationService>(),
           ),
         ),
 
@@ -55,7 +70,14 @@ class UniMarketApp extends StatelessWidget {
 
         ChangeNotifierProvider(create: (_) => HomeViewModel()),
         ChangeNotifierProvider(create: (_) => BrowseViewModel()),
-        ChangeNotifierProvider(create: (_) => SellViewModel()),
+        ChangeNotifierProxyProvider<SessionViewModel, SellViewModel>(
+          create: (context) => SellViewModel(context.read<SessionViewModel>()),
+          update: (_, session, previous) {
+            if (previous == null) return SellViewModel(session);
+            previous.updateSession(session);
+            return previous;
+          },
+        ),
 
         ProxyProvider<SessionViewModel, GoRouter>(
           update: (_, session, __) => createAppRouter(session),

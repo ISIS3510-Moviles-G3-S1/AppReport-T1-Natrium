@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../view_models/browse_view_model.dart';
-import '../../data/mock_data.dart';
 
 class FilterSheet extends StatelessWidget {
   final BrowseViewModel vm;
@@ -55,7 +54,9 @@ class FilterSheet extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children:
-                            MockData.categories.map((c) {
+                            const [
+                              'Jackets', 'Tops', 'Bottoms', 'Shoes', 'Accessories', 'Other'
+                            ].map((c) {
                               final selected = vm.category == c;
                               return FilterChip(
                                 label: Text(c),
@@ -88,7 +89,9 @@ class FilterSheet extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children:
-                            MockData.sizes.map((s) {
+                            const [
+                              'XS', 'S', 'M', 'L', 'XL', 'XXL'
+                            ].map((s) {
                               final selected = vm.size == s;
                               return FilterChip(
                                 label: Text(s),
@@ -121,7 +124,9 @@ class FilterSheet extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children:
-                            MockData.conditions.map((c) {
+                            const [
+                              'New', 'Like New', 'Good', 'Fair', 'Poor'
+                            ].map((c) {
                               final selected = vm.condition == c;
                               return FilterChip(
                                 label: Text(c),
@@ -154,22 +159,24 @@ class FilterSheet extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children:
-                            MockData.colorFilters.map((c) {
+                            const [
+                              ('Blue', 'Blue'), ('Black', 'Black'), ('White', 'White'), ('Red', 'Red'), ('Green', 'Green'), ('Yellow', 'Yellow'), ('Pink', 'Pink'), ('Purple', 'Purple'), ('Brown', 'Brown'), ('Gray', 'Gray'), ('Other', 'Other')
+                            ].map((c) {
                               final selected = vm.color == c.$1;
                               return GestureDetector(
                                 onTap: () => vm.color = c.$1,
                                 child: Container(
-                                  width: 28,
-                                  height: 28,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Color(c.$2),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color:
-                                          selected
-                                              ? AppTheme.sage
-                                              : Colors.transparent,
-                                      width: 2,
+                                    color: selected ? AppTheme.sage : chipBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: chipBorderColor == null ? null : Border.all(color: chipBorderColor),
+                                  ),
+                                  child: Text(
+                                    c.$2,
+                                    style: TextStyle(
+                                      color: selected ? AppTheme.sageDark : (isDark ? colorScheme.onSurface : AppTheme.foreground),
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),

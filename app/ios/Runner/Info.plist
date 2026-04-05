@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>UniMarket uses the camera so you can take photos of clothing items when creating a listing.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>UniMarket uses your photo library so you can choose clothing photos for listing analysis and publishing.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>UniMarket may save listing photos to your library when you choose to export or share images.</string>
 </dict>
 </plist>

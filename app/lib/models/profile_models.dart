@@ -40,6 +40,10 @@ class MyListing {
   final double price;
   final String status; // 'Active' | 'Sold'
   final String image;
+  // Add fields for compatibility with Listing usages
+  final List<String> imageURLs;
+  final String imagePath;
+  final String title;
 
   const MyListing({
     required this.id,
@@ -47,7 +51,10 @@ class MyListing {
     required this.price,
     required this.status,
     required this.image,
-  });
+    this.imageURLs = const [],
+    this.imagePath = '',
+    String? title,
+  }) : title = title ?? name;
 }
 
 class Level {

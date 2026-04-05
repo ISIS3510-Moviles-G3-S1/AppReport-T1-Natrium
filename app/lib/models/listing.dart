@@ -1,48 +1,132 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 /// Light listing for browse grid and home featured.
 class Listing {
-  final int id;
-  final String name;
-  final double price;
-  final String size;
-  final String condition;
-  final String category;
-  final String color;
-  final String style;
-  final String seller;
-  final double rating;
-  final String image;
+    Map<String, dynamic> toJson() => toFirestore();
+  final String id;
+  final String sellerId;
+  final String title;
+  final int price;
+  final String conditionTag;
+  final String description;
+  final String sellerName;
+  final String exchangeType;
   final List<String> tags;
+  final double rating;
+  final String imageName;
+  final DateTime? createdAt;
+  final DateTime? soldAt;
+  final String imagePath;
+  final List<String> imageURLs;
+  final String status;
   final bool saved;
 
   const Listing({
     required this.id,
-    required this.name,
+    required this.sellerId,
+    required this.title,
     required this.price,
-    required this.size,
-    required this.condition,
-    required this.category,
-    required this.color,
-    required this.style,
-    required this.seller,
-    required this.rating,
-    required this.image,
+    required this.conditionTag,
+    required this.description,
+    required this.sellerName,
+    this.exchangeType = 'sell',
     this.tags = const [],
+    this.rating = 0,
+    this.imageName = '',
+    this.createdAt,
+    this.soldAt,
+    this.imagePath = '',
+    this.imageURLs = const [],
+    this.status = 'active',
     this.saved = false,
   });
 
   Listing copyWith({bool? saved}) => Listing(
     id: id,
-    name: name,
+    sellerId: sellerId,
+    title: title,
     price: price,
-    size: size,
-    condition: condition,
-    category: category,
-    color: color,
-    style: style,
-    seller: seller,
-    rating: rating,
-    image: image,
+    conditionTag: conditionTag,
+    description: description,
+    sellerName: sellerName,
+    exchangeType: exchangeType,
     tags: tags,
+    rating: rating,
+    imageName: imageName,
+    createdAt: createdAt,
+    soldAt: soldAt,
+    imagePath: imagePath,
+    imageURLs: imageURLs,
+    status: status,
     saved: saved ?? this.saved,
   );
+
+  String get primaryImageUrl {
+    for (final url in imageURLs) {
+      if (url.trim().isNotEmpty) return url;
+    }
+    if (imagePath.trim().isNotEmpty) return imagePath;
+    return '';
+  }
+
+  bool get hasPrimaryImage => primaryImageUrl.isNotEmpty;
+
+  static List<String> _coerceStringList(dynamic value) {
+    if (value is List) {
+      return value.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return [value];
+    }
+    return [];
+  }
+
+  factory Listing.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final rawImages =
+        data['imageURLs'] ??
+        data['imageUrls'] ??
+        data['imageURLS'] ??
+        data['imageUrl'] ??
+        data['image'] ??
+        [];
+    return Listing(
+      id: doc.id,
+      sellerId: data['sellerId'] ?? '',
+      title: data['title'] ?? '',
+      price: (data['price'] ?? 0) is int ? data['price'] : int.tryParse(data['price'].toString()) ?? 0,
+      conditionTag: data['conditionTag'] ?? '',
+      description: data['description'] ?? '',
+      sellerName: data['sellerName'] ?? '',
+      exchangeType: data['exchangeType'] ?? data['exchange_type'] ?? 'sell',
+      tags: List<String>.from(data['tags'] ?? []),
+      rating: (data['rating'] ?? 0).toDouble(),
+      imageName: data['imageName'] ?? '',
+      createdAt: (data['createdAt'] is Timestamp) ? (data['createdAt'] as Timestamp).toDate() : null,
+      soldAt: (data['soldAt'] is Timestamp) ? (data['soldAt'] as Timestamp).toDate() : null,
+      imagePath: data['imagePath'] ?? '',
+      imageURLs: _coerceStringList(rawImages),
+      status: data['status'] ?? 'active',
+      saved: false,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'sellerId': sellerId,
+      'title': title,
+      'price': price,
+      'conditionTag': conditionTag,
+      'description': description,
+      'sellerName': sellerName,
+      'exchangeType': exchangeType,
+      'tags': tags,
+      'rating': rating,
+      'imageName': imageName,
+      'createdAt': createdAt,
+      'soldAt': soldAt,
+      'imagePath': imagePath,
+      'imageURLs': imageURLs,
+      'status': status,
+    };
+  }
 }

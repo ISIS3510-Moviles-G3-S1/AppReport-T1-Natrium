@@ -15,15 +15,15 @@ class AllItemsRecommendation implements ItemRecommendation {
 }
 
 /// Decorator for filtering by user's most frequent categories.
-class CategoryFilterDecorator implements ItemRecommendation {
+class TagFilterDecorator implements ItemRecommendation {
   final ItemRecommendation base;
-  final List<String> frequentCategories;
+  final List<String> frequentTags;
 
-  CategoryFilterDecorator(this.base, this.frequentCategories);
+  TagFilterDecorator(this.base, this.frequentTags);
 
   @override
   List<Listing> getItems() {
-    return base.getItems().where((item) => frequentCategories.contains(item.category)).toList();
+    return base.getItems().where((item) => item.tags.any((tag) => frequentTags.contains(tag))).toList();
   }
 }
 
@@ -31,7 +31,7 @@ class CategoryFilterDecorator implements ItemRecommendation {
 class NewItemPriorityDecorator implements ItemRecommendation {
   final ItemRecommendation base;
   final DateTime newThreshold;
-  final Map<int, DateTime> itemUploadDates;
+  final Map<String, DateTime> itemUploadDates;
 
   NewItemPriorityDecorator(this.base, this.newThreshold, this.itemUploadDates);
 
@@ -48,14 +48,16 @@ class NewItemPriorityDecorator implements ItemRecommendation {
     return items;
   }
 
-  /// Returns a map of category to count of new items.
-  Map<String, int> countNewItemsPerCategory() {
+  /// Returns a map of tag to count of new items.
+  Map<String, int> countNewItemsPerTag() {
     final items = base.getItems();
     final Map<String, int> counts = {};
     for (final item in items) {
       final isNew = itemUploadDates[item.id]?.isAfter(newThreshold) ?? false;
       if (isNew) {
-        counts[item.category] = (counts[item.category] ?? 0) + 1;
+        for (final tag in item.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
       }
     }
     return counts;

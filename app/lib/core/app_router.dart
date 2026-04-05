@@ -3,17 +3,15 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 // Screens
-import 'package:uni_market/views/screens/home_screen.dart';
-import 'package:uni_market/views/screens/browse_screen.dart';
-import 'package:uni_market/views/screens/item_detail_screen.dart';
-import 'package:uni_market/views/screens/sell_screen.dart';
-import 'package:uni_market/views/screens/profile_screen.dart';
-import 'package:uni_market/views/screens/activity_listings_screen.dart';
-import 'package:uni_market/views/screens/not_found_screen.dart';
-import 'package:uni_market/views/screens/swap_screen.dart';
-import 'package:uni_market/views/screens/donate_screen.dart';
-import 'package:uni_market/views/screens/login_screen.dart';
-import 'package:uni_market/views/screens/register_screen.dart';
+import '../views/screens/home_screen.dart';
+import '../views/screens/browse_screen.dart';
+import '../views/screens/item_detail_screen.dart';
+import '../views/screens/sell_screen.dart';
+import '../views/screens/profile_screen.dart';
+import '../views/screens/activity_listings_screen.dart';
+import '../views/screens/not_found_screen.dart';
+import '../views/screens/login_screen.dart';
+import '../views/screens/register_screen.dart';
 
 // Widgets
 import 'package:uni_market/views/widgets/main_shell.dart';
@@ -136,32 +134,9 @@ GoRouter createAppRouter(SessionViewModel session) {
         ],
       ),
 
-      /// ITEM DETAIL
-      GoRoute(
-        path: '/item/:id',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          return ChangeNotifierProvider(
-            create: (_) => ItemDetailViewModel()..loadItem(id),
-            child: const ItemDetailScreen(),
-          );
-        },
-      ),
+      // Removed swap and donate routes
 
-      /// SWAP
-      GoRoute(
-        path: '/swap',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const SwapScreen(),
-      ),
-
-      /// DONATE
-      GoRoute(
-        path: '/donate',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const DonateScreen(),
-      ),
+      // Rutas swap y donate eliminadas
     ],
   );
 }
