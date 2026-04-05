@@ -78,6 +78,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               const SizedBox(height: 16),
 
+              /// LOGO
+              Center(
+                child: Column(
+                  children: [
+                    Image.asset(
+                      'assets/images/uni_market_logo.png',
+                      height: 60,
+                      width: 60,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "UniMarket",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
               /// EMAIL
               TextFormField(
                 controller: _emailController,
@@ -140,11 +165,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               /// ERROR
               if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

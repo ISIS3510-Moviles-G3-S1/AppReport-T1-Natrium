@@ -20,6 +20,11 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // For testing: simulate auth failure
+    if (email == "test@error.com") {
+      throw const AuthFailure('Invalid credentials', code: 'invalid-credential');
+    }
+
     try {
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
@@ -28,7 +33,7 @@ class AuthService {
       return await _hydrateUser(credential.user!);
     } on FirebaseAuthException catch (e) {
       throw AuthFailure.fromFirebaseException(e);
-    } catch (_) {
+    } catch (e) {
       throw const AuthFailure('Unable to sign in. Please try again');
     }
   }
