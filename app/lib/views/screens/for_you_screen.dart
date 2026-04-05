@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/app_theme.dart';
+import '../../core/price_formatter.dart';
 import '../../view_models/browse_view_model.dart';
 import '../widgets/filter_sheet.dart';
 import 'browse_screen.dart';
@@ -32,20 +33,22 @@ class _ListingCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  CachedNetworkImage(
-                    imageUrl: listing.image,
-                    fit: BoxFit.cover,
-                    placeholder:
-                        (_, __) => Container(
-                          color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
+                  if (listing.hasPrimaryImage)
+                    CachedNetworkImage(
+                      imageUrl: listing.primaryImageUrl,
+                      fit: BoxFit.cover,
+                      placeholder:
+                          (_, __) => Container(
+                            color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
                           ),
-                        ),
-                    errorWidget:
-                        (_, __, ___) =>
-                            const Icon(Icons.image_not_supported, size: 40),
-                  ),
+                      errorWidget:
+                          (_, __, ___) => const Icon(Icons.image_not_supported, size: 40),
+                    )
+                  else
+                    const Center(child: Icon(Icons.image_not_supported, size: 40)),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -86,7 +89,7 @@ class _ListingCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        listing.condition,
+                        listing.conditionTag,
                         style: const TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
@@ -103,7 +106,7 @@ class _ListingCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    listing.name,
+                    listing.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -116,7 +119,7 @@ class _ListingCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '\$${listing.price.toStringAsFixed(0)}',
+                        PriceFormatter.formatCop(listing.price),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -124,7 +127,7 @@ class _ListingCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        listing.seller,
+                        listing.sellerName,
                         style: TextStyle(
                           fontSize: 10,
                           color: mutedText,
@@ -152,10 +155,10 @@ class ForYouScreen extends StatelessWidget {
     final mutedText = isDark ? colorScheme.onSurface.withOpacity(0.72) : AppTheme.mutedForeground;
     return Consumer<BrowseViewModel>(
       builder: (context, vm, _) {
+        final searchLower = vm.search.toLowerCase();
         final filteredItems = vm.forYouRecommendations.where((item) {
-          final searchLower = vm.search.toLowerCase();
-          return item.name.toLowerCase().contains(searchLower) ||
-              item.category.toLowerCase().contains(searchLower);
+          return item.title.toLowerCase().contains(searchLower) ||
+            item.tags.any((tag) => tag.toLowerCase().contains(searchLower));
         }).toList();
         return Scaffold(
           body: SafeArea(
@@ -163,8 +166,11 @@ class ForYouScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Responsive top padding for tab bar
+                SizedBox(height: MediaQuery.of(context).size.height * 0.04),
                 Container(
                   color: colorScheme.surface,
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: MediaQuery.of(context).size.height * 0.01),
                   child: Row(
                     children: [
                       Expanded(

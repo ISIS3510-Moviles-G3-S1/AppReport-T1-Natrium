@@ -24,6 +24,17 @@ class AppTheme {
   static const Color foreground = Color(0xFF2B2B2B); // --foreground / charcoal
   static const Color destructive = Color(0xFFDC2626);
 
+  // Color chips
+  static const Color chipBg = Color(0xFFF1F1E8);
+  static const Color chipCloseBg = Color(0xFF6F6F6A);
+
+  // Info box
+  static const Color infoBg = Color(0xFFEAF2FB);
+  static const Color infoBorder = Color(0xFFD7E5F5);
+  static const Color infoIcon = Color(0xFF4C88C7);
+  static const Color secondaryText = Color(0xFF7A7A7A);
+
+
   // ─── Light theme (Strategy: DayThemeStrategy) ─────────────────────────────
 
   /// The app's light theme — used by [DayThemeStrategy] (6 AM – 6:59 PM).

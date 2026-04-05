@@ -127,36 +127,58 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 40),
 
-              const SizedBox(height: 8),
+                    /// LOGO
+                    Column(
+                      children: const [
+                        Icon(Icons.checkroom, size: 60),
+                        SizedBox(height: 10),
+                        Text(
+                          "UniMarket",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
 
-              const Text(
-                "Log in to continue buying and selling on UniMarket.",
-              ),
+                    const SizedBox(height: 40),
 
-              const SizedBox(height: 30),
+                    /// TITLE
+                    const Text(
+                      "Welcome back",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
-              /// EMAIL
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: "University Email",
-                  hintText: "username@uniandes.edu.co",
-                ),
-              ),
+                    const SizedBox(height: 8),
 
-              const SizedBox(height: 16),
+                    const Text(
+                      "Log in to continue buying and selling on UniMarket.",
+                    ),
 
-              /// PASSWORD
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Password",
-                ),
-              ),
+                    const SizedBox(height: 30),
 
-              const SizedBox(height: 24),
+                    /// EMAIL
+                    TextField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        labelText: "University Email",
+                        hintText: "username@uniandes.edu.co",
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
 
               /// ERROR
               if (errorMessage != null)
@@ -192,33 +214,45 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-              const SizedBox(height: 12),
+                    const SizedBox(height: 24),
 
-              /// LOGIN BUTTON
-              ElevatedButton(
-                onPressed: _isLoading ? null : _login,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text("Log in"),
+                    /// ERROR
+                    if (_error != null)
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+
+                    const SizedBox(height: 12),
+
+                    /// LOGIN BUTTON
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _login,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text("Log in"),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    /// REGISTER
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              context.go('/register');
+                            },
+                      child: const Text("Create an account"),
+                    ),
+                  ],
+                ),
               ),
-
-              const SizedBox(height: 16),
-
-              /// REGISTER
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        context.go('/register');
-                      },
-                child: const Text("Create an account"),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

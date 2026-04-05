@@ -1,12 +1,23 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import '../data/mock_data.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import '../core/photo_quality_analyzer.dart';
+import 'package:flutter/material.dart';
+import '../data/listing_service.dart';
+import '../models/listing.dart';
+import 'session_view_model.dart';
 
 class SellViewModel extends ChangeNotifier {
-  String? _photoPath;
-  bool _aiLoading = false;
-  bool _aiDone = false;
-  double _aiProgress = 0;
+  SellViewModel(this._session);
+
+  final ListingService _listingService = ListingService();
+  SessionViewModel _session;
+
+  void updateSession(SessionViewModel session) {
+    _session = session;
+  }
+
   bool _published = false;
 
   String _title = '';
@@ -14,15 +25,10 @@ class SellViewModel extends ChangeNotifier {
   String _price = '';
   String _condition = 'Good';
   String _exchangeType = 'sell';
-  String _size = '';
-  String _color = '';
-  String _category = '';
-  String _style = '';
+  List<String> _tags = [];
+  String _tagsInput = '';
+  List<XFile> _images = [];
 
-  String? get photoPath => _photoPath;
-  bool get aiLoading => _aiLoading;
-  bool get aiDone => _aiDone;
-  double get aiProgress => _aiProgress;
   bool get published => _published;
 
   String get title => _title;
@@ -55,92 +61,105 @@ class SellViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get size => _size;
-  set size(String v) {
-    _size = v;
+  List<String> get tags => _tags;
+  set tags(List<String> v) {
+    _tags = v;
+    _tagsInput = _tags.join(', ');
     notifyListeners();
   }
 
-  String get color => _color;
-  set color(String v) {
-    _color = v;
+  String get tagsInput => _tagsInput;
+  set tagsInput(String v) {
+    _tagsInput = v;
+    _tags = _parseTags(v);
     notifyListeners();
   }
 
-  String get category => _category;
-  set category(String v) {
-    _category = v;
+  List<XFile> get images => _images;
+
+  List<String> _parseTags(String value) {
+    return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  void applyAnalysisTags(Map<String, List<String>> tags) {
+    final ordered = <String>[];
+    for (final key in const ['category', 'color', 'style', 'pattern']) {
+      ordered.addAll(tags[key] ?? const []);
+    }
+
+    _tags = ordered;
+    _tagsInput = ordered.join(', ');
+
+    if (_title.isEmpty && (tags['category']?.isNotEmpty ?? false)) {
+      _title = tags['category']!.first;
+    }
+
     notifyListeners();
   }
 
-  String get style => _style;
-  set style(String v) {
-    _style = v;
-    notifyListeners();
-  }
 
-  void setPhotoFromFile(File file) {
-    _photoPath = file.path;
-    notifyListeners();
-    runAiTagging();
-  }
 
-  void setPhotoFromUrl(String url) {
-    _photoPath = url;
-    notifyListeners();
-    runAiTagging();
-  }
+  // (keep only one addImage method)
 
-  void runAiTagging() {
-    _aiLoading = true;
-    _aiProgress = 0;
-    _aiDone = false;
-    notifyListeners();
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 60));
-      _aiProgress += 4;
-      if (_aiProgress >= 100) {
-        _aiLoading = false;
-        _aiDone = true;
-        _title = _title.isEmpty ? 'Casual Denim Jacket' : _title;
-        _size = 'M';
-        _color = 'Blue';
-        _category = 'Jackets';
-        _style = 'Casual';
-        _condition = 'Good';
-        _aiProgress = 100;
-        notifyListeners();
-        return false;
-      }
+  void addImage(XFile file) {
+    if (_images.length < 5) {
+      _images.add(file);
+      debugPrint('[SellVM] add image: ${file.name}');
       notifyListeners();
-      return true;
-    });
+    }
   }
 
-  void publish() {
+  void removeImageAt(int index) {
+    if (index >= 0 && index < _images.length) {
+      _images.removeAt(index);
+      notifyListeners();
+    }
+  }
+
+  Future<void> publish() async {
+    final user = _session.currentUser;
+    final sellerName = user == null
+        ? 'Me'
+        : (user.displayName.trim().isNotEmpty
+            ? user.displayName
+            : user.email.split('@').first);
+    final parsedPrice = int.tryParse(_price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+    // Soporte para múltiples imágenes
+    final listing = Listing(
+      id: '', // Se asignará por Firestore
+      sellerId: '', // Se asignará en ListingService
+      title: _title,
+      price: parsedPrice,
+      conditionTag: _condition,
+      description: _description,
+      sellerName: sellerName,
+      exchangeType: _exchangeType,
+      tags: _tags,
+      rating: 0,
+      imageName: '',
+      createdAt: null,
+      soldAt: null,
+      imagePath: '',
+      imageURLs: const [],
+      status: 'active',
+      saved: false,
+    );
+    debugPrint('[SellVM] publishing ${_images.length} selected images');
+    await _listingService.createListing(listing: listing, images: _images);
     _published = true;
     notifyListeners();
   }
 
   void resetAfterPublish() {
-    _photoPath = null;
-    _aiLoading = false;
-    _aiDone = false;
-    _aiProgress = 0;
     _published = false;
     _title = '';
-    _description = '';
+    _images = [];
     _price = '';
     _condition = 'Good';
     _exchangeType = 'sell';
-    _size = '';
-    _color = '';
-    _category = '';
-    _style = '';
+    _tags = [];
+    _tagsInput = '';
     notifyListeners();
   }
-
-  static String get randomSustainabilityTip =>
-      MockData.sustainabilityTips[(DateTime.now().millisecondsSinceEpoch %
-          MockData.sustainabilityTips.length)];
 }

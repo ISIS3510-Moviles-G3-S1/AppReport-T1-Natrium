@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
+import '../../core/price_formatter.dart';
 import '../../view_models/item_detail_view_model.dart';
 import '../../models/item_detail.dart';
 import '../../models/seller.dart';
@@ -21,9 +22,6 @@ class ItemDetailScreen extends StatelessWidget {
         child: Consumer<ItemDetailViewModel>(
           builder: (context, vm, _) {
             final item = vm.item;
-            if (item == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               child: Column(
@@ -38,24 +36,20 @@ class ItemDetailScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () => context.go('/browse'),
                           child: Padding(
-                            // Larger touch target for easier tapping.
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 8,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.chevron_left_rounded,
                                   size: 20,
-                                  color: backTextColor,
+                                  color: isDark ? colorScheme.onSurface.withAlpha(200) : AppTheme.mutedForeground,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Back to Browse',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: backTextColor,
+                                    color: isDark ? colorScheme.onSurface.withAlpha(200) : AppTheme.mutedForeground,
                                   ),
                                 ),
                               ],
@@ -78,9 +72,11 @@ class ItemDetailScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _Gallery(item: item, vm: vm),
-                            const SizedBox(height: 12),
-                            _InfoSection(item: item, vm: vm),
+                            if (item != null) ...[
+                              _Gallery(item: item!, vm: vm),
+                              const SizedBox(height: 12),
+                              _InfoSection(item: item!, vm: vm),
+                            ],
                           ],
                         ),
                       ),
@@ -106,63 +102,21 @@ class _Gallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: AspectRatio(
-            aspectRatio: 4 / 5,
-            child: CachedNetworkImage(
-              imageUrl: item.images[vm.activeImageIndex],
-              fit: BoxFit.cover,
-              placeholder:
-                  (_, __) => Container(
-                    color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-              errorWidget:
-                  (_, __, ___) =>
-                      const Icon(Icons.image_not_supported, size: 48),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: List.generate(item.images.length, (i) {
-            final active = vm.activeImageIndex == i;
-            return GestureDetector(
-              onTap: () => vm.setActiveImage(i),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        active
-                            ? (isDark ? colorScheme.primary : AppTheme.deepGreen)
-                            : Colors.transparent,
-                    width: 3,
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: CachedNetworkImage(
-                    imageUrl: item.images[i],
-                    fit: BoxFit.cover,
-                    errorWidget:
-                        (_, __, ___) => const Icon(Icons.image_rounded),
-                  ),
-                ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: AspectRatio(
+        aspectRatio: 4 / 5,
+        child: item.images.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: item.images[0],
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
+              )
+            : Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.image_rounded, size: 80),
               ),
-            );
-          }),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -198,12 +152,7 @@ class _InfoSection extends StatelessWidget {
             : item.aiScore >= 80
             ? AppTheme.warmBeige
             : secondaryTextColor;
-    final exchangeLabel =
-        item.exchangeType == 'sell'
-            ? 'For Sale'
-            : item.exchangeType == 'swap'
-            ? 'For Swap'
-            : 'Free / Donate';
+    final exchangeLabel = 'Free / Donate';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,7 +190,7 @@ class _InfoSection extends StatelessWidget {
           ],
         ),
         Text(
-          '\$${item.price.toStringAsFixed(0)}',
+          PriceFormatter.formatCopFromNum(item.price),
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -295,42 +244,6 @@ class _InfoSection extends StatelessWidget {
           spacing: 6,
           runSpacing: 6,
           children: [
-            Chip(
-              label: Text(
-                'Size ${item.size}',
-                style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
-              ),
-              backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: borderColor),
-              shape: const StadiumBorder(),
-            ),
-            Chip(
-              label: Text(
-                item.color,
-                style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
-              ),
-              backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: borderColor),
-              shape: const StadiumBorder(),
-            ),
-            Chip(
-              label: Text(
-                item.category,
-                style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
-              ),
-              backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: borderColor),
-              shape: const StadiumBorder(),
-            ),
-            Chip(
-              label: Text(
-                item.style,
-                style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
-              ),
-              backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: borderColor),
-              shape: const StadiumBorder(),
-            ),
             ...item.tags
                 .take(3)
                 .map(
@@ -622,7 +535,7 @@ class _SimilarSection extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: GestureDetector(
-                  onTap: () => context.go('/item/${s.id}'),
+                  onTap: () => context.go('/item/${s['id']}'),
                   child: SizedBox(
                     width: 140,
                     child: Card(
@@ -632,11 +545,9 @@ class _SimilarSection extends StatelessWidget {
                         children: [
                           Expanded(
                             child: CachedNetworkImage(
-                              imageUrl: s.image,
+                              imageUrl: s['image'],
                               fit: BoxFit.cover,
-                              errorWidget:
-                                  (_, __, ___) =>
-                                      const Icon(Icons.image_rounded),
+                              errorWidget: (context, url, error) => const Icon(Icons.image_rounded),
                             ),
                           ),
                           Padding(
@@ -645,7 +556,7 @@ class _SimilarSection extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  s.name,
+                                  s['name'],
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -654,7 +565,7 @@ class _SimilarSection extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  '\$${s.price.toStringAsFixed(0)}',
+                                  PriceFormatter.formatCopFromNum((s['price'] as num?) ?? 0),
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,

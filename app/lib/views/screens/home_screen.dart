@@ -1,14 +1,77 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
+import '../../core/price_formatter.dart';
 import '../../view_models/home_view_model.dart';
 import '../../view_models/session_view_model.dart';
 import '../../models/listing.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _inactivityDialogShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check for inactivity when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkInactivity();
+    });
+  }
+
+  Future<void> _checkInactivity() async {
+    if (_inactivityDialogShown) return;
+
+    final sessionVM = context.read<SessionViewModel>();
+    if (sessionVM.currentUser != null) {
+      try {
+        final isInactive = await sessionVM.checkInactivity(days: 3);
+
+        if (isInactive && mounted) {
+          _showInactivityDialog();
+          _inactivityDialogShown = true;
+        }
+      } catch (e) {
+        debugPrint('Error checking inactivity: $e');
+      }
+    }
+  }
+
+  void _showInactivityDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¡Te extrañamos! 👀'),
+        content: const Text(
+          'Han pasado unos días desde tu última visita. '
+          '¡Hay nuevos artículos esperándote!'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/browse');
+            },
+            child: const Text('Ver artículos'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +266,7 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => context.go('/donate'),
+                                  onPressed: null,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.deepGreen,
                                   side: BorderSide(color: pillBorder),
@@ -230,7 +293,7 @@ class HomeScreen extends StatelessWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => context.go('/swap'),
+                                  onPressed: null,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: AppTheme.deepGreen,
                                   side: BorderSide(color: pillBorder),
@@ -366,19 +429,21 @@ class _FeaturedCard extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: CachedNetworkImage(
-            imageUrl: item.image,
-            height: 280,
-            width: 260,
-            fit: BoxFit.cover,
-            placeholder:
-                (_, __) => Container(
-                  color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-            errorWidget:
-                (_, __, ___) => const Icon(Icons.image_not_supported, size: 48),
-          ),
+          child: item.hasPrimaryImage
+              ? CachedNetworkImage(
+                  imageUrl: item.primaryImageUrl,
+                  height: 280,
+                  width: 260,
+                  fit: BoxFit.cover,
+                  placeholder:
+                      (_, __) => Container(
+                        color: isDark ? colorScheme.surfaceContainerHighest : AppTheme.muted,
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                  errorWidget:
+                      (_, __, ___) => const Icon(Icons.image_not_supported, size: 48),
+                )
+              : const Center(child: Icon(Icons.image_not_supported, size: 48)),
         ),
         Positioned(
           bottom: -12,
@@ -416,8 +481,8 @@ class _FeaturedCard extends StatelessWidget {
                         color: isDark ? colorScheme.onSurface : AppTheme.foreground,
                       ),
                     ),
-                    Text(
-                      'Size ${item.size} · ${item.style} · ${item.condition}',
+                        Text(
+                          item.conditionTag,
                       style: TextStyle(
                         fontSize: 10,
                         color: mutedText,
@@ -453,15 +518,15 @@ class _FeaturedCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '\$${item.price.toStringAsFixed(0)}',
+                  PriceFormatter.formatCopFromNum(item.price),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.sageDark,
                   ),
                 ),
-                Text(
-                  '${item.condition} ✓',
+                    Text(
+                      '${item.conditionTag} ✓',
                   style: TextStyle(fontSize: 10, color: AppTheme.sageDark),
                 ),
               ],

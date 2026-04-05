@@ -1,12 +1,18 @@
+
+// ...existing code...
+// ...existing code...
+
 import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/widgets.dart';
-import '../view_models/browse_view_model.dart';
+import 'package:provider/provider.dart';
 import '../models/item_detail.dart';
-import '../data/mock_data.dart';
+import '../models/seller.dart';
+import '../data/listing_service.dart';
+import '../view_models/browse_view_model.dart';
 
 class ItemDetailViewModel extends ChangeNotifier {
   ItemDetail? _item;
+  final ListingService _listingService = ListingService();
   int _activeImageIndex = 0;
   bool _saved = false;
   bool _messageSent = false;
@@ -16,12 +22,22 @@ class ItemDetailViewModel extends ChangeNotifier {
   bool get saved => _saved;
   bool get messageSent => _messageSent;
 
-  void loadItem(int id) {
-    try {
-      _item = MockData.itemDetails.firstWhere((e) => e.id == id);
-    } catch (_) {
-      _item =
-          MockData.itemDetails.isNotEmpty ? MockData.itemDetails.first : null;
+  Future<void> loadItem(String id) async {
+    final listing = await _listingService.getListingById(id);
+    if (listing != null) {
+        _item = ItemDetail(
+          id: id,
+          name: listing.title,
+          price: listing.price.toDouble(),
+          condition: listing.conditionTag,
+          seller: Seller(name: listing.sellerName, university: '', rating: listing.rating, sales: 0, avatar: '', verified: false),
+          aiScore: 0,
+          description: listing.description,
+          images: listing.imageURLs.isNotEmpty ? [listing.imageURLs[0]] : [listing.imagePath],
+          tags: listing.tags,
+        );
+    } else {
+      _item = null;
     }
     _activeImageIndex = 0;
     _saved = false;
@@ -48,6 +64,9 @@ class ItemDetailViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<({int id, String name, double price, String image})> get similarItems =>
-      MockData.similarItems;
+  List<Map<String, dynamic>> get similarItems => [
+    {'id': 1, 'name': 'Item 1', 'price': 10.0, 'image': 'https://via.placeholder.com/150'},
+    {'id': 2, 'name': 'Item 2', 'price': 20.0, 'image': 'https://via.placeholder.com/150'},
+    {'id': 3, 'name': 'Item 3', 'price': 30.0, 'image': 'https://via.placeholder.com/150'},
+  ];
 }

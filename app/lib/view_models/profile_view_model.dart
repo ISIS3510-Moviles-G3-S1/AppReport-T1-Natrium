@@ -1,15 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/app_user.dart';
 import '../models/profile_models.dart';
+import '../models/listing.dart';
+import '../data/listing_service.dart';
 import 'session_view_model.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel(this._session) {
     _session.addListener(_forwardSessionChanges);
+    _startListingsListener();
   }
 
   final SessionViewModel _session;
+  final ListingService _listingService = ListingService();
+  StreamSubscription<List<Listing>>? _listingsSub;
+  List<Listing> _listings = [];
 
   AppUser? get _user => _session.currentUser;
 
@@ -51,7 +59,7 @@ class ProfileViewModel extends ChangeNotifier {
 
   List<ActivityItem> get activityFeed => const [];
 
-  List<MyListing> get listings => const [];
+  List<Listing> get listings => _listings;
 
   Level get currentLevel => const Level(level: 1, name: 'Newcomer', minXp: 0);
 
@@ -59,13 +67,43 @@ class ProfileViewModel extends ChangeNotifier {
 
   double get levelProgress => 0;
 
-  void deleteListing(int id) {}
+  Future<void> deleteListing(String id) async {
+    final listing = _listings.firstWhere((l) => l.id == id, orElse: () => const Listing(
+      id: '',
+      sellerId: '',
+      title: '',
+      price: 0,
+      conditionTag: '',
+      description: '',
+      sellerName: '',
+    ));
+    if (listing.id.isEmpty) return;
+    await _listingService.deleteListing(listing);
+  }
 
-  void _forwardSessionChanges() => notifyListeners();
+  void _startListingsListener() {
+    _listingsSub?.cancel();
+    final user = _user;
+    if (user == null) {
+      _listings = [];
+      notifyListeners();
+      return;
+    }
+    _listingsSub = _listingService.getListingsBySellerId(user.uid).listen((items) {
+      _listings = items;
+      notifyListeners();
+    });
+  }
+
+  void _forwardSessionChanges() {
+    _startListingsListener();
+    notifyListeners();
+  }
 
   @override
   void dispose() {
     _session.removeListener(_forwardSessionChanges);
+    _listingsSub?.cancel();
     super.dispose();
   }
 }

@@ -1,34 +1,40 @@
 import '../models/listing.dart';
 import '../core/recommendation_system.dart';
+import 'ai_recommendation_decorator.dart';
 
-/// Example usage for dynamic decorator combination.
-/// This can be moved to a service or view model as needed.
 class RecommendationService {
   final List<Listing> allItems;
-  final List<String> userFrequentCategories;
-  final Map<int, DateTime> itemUploadDates;
+  final List<String> userFrequentTags;
+  final Map<String, DateTime> itemUploadDates;
   final DateTime newThreshold;
+  final String? aiApiUrl;
+  final String? userId;
 
   RecommendationService({
     required this.allItems,
-    required this.userFrequentCategories,
+    required List<String> userFrequentCategories,
     required this.itemUploadDates,
     required this.newThreshold,
-  });
+    this.aiApiUrl,
+    this.userId,
+  }) : userFrequentTags = userFrequentCategories;
 
-  /// Get personalized recommendations.
+  /// Get personalized recommendations (sync fallback, AI async recommended for real app)
   List<Listing> getRecommendations() {
     ItemRecommendation base = AllItemsRecommendation(allItems);
-    base = CategoryFilterDecorator(base, userFrequentCategories);
+    base = TagFilterDecorator(base, userFrequentTags);
     base = NewItemPriorityDecorator(base, newThreshold, itemUploadDates);
+    if (aiApiUrl != null && userId != null) {
+      base = AIRecommendationDecorator(base, apiUrl: aiApiUrl!, userId: userId!);
+    }
     return base.getItems();
   }
 
-  /// Get count of new items per frequent category.
+  /// Get count of new items per frequent tag.
   Map<String, int> getNewItemCounts() {
     ItemRecommendation base = AllItemsRecommendation(allItems);
-    base = CategoryFilterDecorator(base, userFrequentCategories);
+    base = TagFilterDecorator(base, userFrequentTags);
     final newDecorator = NewItemPriorityDecorator(base, newThreshold, itemUploadDates);
-    return newDecorator.countNewItemsPerCategory();
+    return newDecorator.countNewItemsPerTag();
   }
 }
