@@ -35,7 +35,7 @@ class UniMarketApp extends StatelessWidget {
 
         Provider(create: (_) => AuthService()),
 
-        ChangeNotifierProvider(
+        ChangeNotifierProvider<SessionViewModel>(
           create: (context) => SessionViewModel(
             authService: context.read<AuthService>(),
           ),
