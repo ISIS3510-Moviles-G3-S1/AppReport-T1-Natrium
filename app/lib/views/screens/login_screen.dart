@@ -17,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  String? _error;
 
   @override
   void dispose() {
@@ -26,58 +25,84 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+  }
 
+  ///DIALOGO DE ERROR CENTRAL
+  Future<void> _showErrorDialog(String message) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        title: const Text("Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ///LOGIN
+  Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
+    /// 1. CAMPOS VACÍOS
     if (email.isEmpty || password.isEmpty) {
-      setState(() {
-        _error = "Please fill all fields";
-        _isLoading = false;
-      });
+      await _showErrorDialog("Please fill all fields");
       return;
     }
+
+    /// 2. EMAIL INVÁLIDO
+    if (!_isValidEmail(email)) {
+      await _showErrorDialog("Invalid email format");
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       await context.read<SessionViewModel>().signIn(
             email: email,
             password: password,
           );
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
     } on AuthFailure catch (failure) {
-      if (!mounted) return;
+      /// 3. CREDENCIALES INCORRECTAS
       final errorMessage = _messageForFailure(failure);
-      setState(() {
-        _error = errorMessage;
-        _isLoading = false;
-      });
+      await _showErrorDialog(errorMessage);
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = "Unable to sign in. Please try again";
-        _isLoading = false;
-      });
+      await _showErrorDialog("Unexpected error. Please try again");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
+  
   String _messageForFailure(AuthFailure failure) {
     switch (failure.code) {
       case 'user-not-found':
         return 'User not found';
       case 'wrong-password':
         return 'Incorrect password';
+      case 'invalid-credential':
+        return 'Invalid credentials';
       case 'invalid-email':
         return 'Invalid email';
       default:
-        return failure.message;
+        return 'Login failed. Please try again';
     }
   }
 
@@ -89,7 +114,8 @@ class _LoginScreenState extends State<LoginScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(
                 24,
                 24,
@@ -97,7 +123,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 24 + MediaQuery.of(context).viewInsets.bottom,
               ),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                constraints:
+                    BoxConstraints(minHeight: constraints.maxHeight - 48),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
@@ -106,10 +133,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     /// LOGO
                     Column(
-                      children: const [
-                        Icon(Icons.checkroom, size: 60),
-                        SizedBox(height: 10),
-                        Text(
+                      children: [
+                        Image.asset(
+                          'assets/images/uni_market_logo.png',
+                          height: 60,
+                          width: 60,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
                           "UniMarket",
                           style: TextStyle(
                             fontSize: 22,
@@ -160,15 +192,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 24),
 
-                    /// ERROR
-                    if (_error != null)
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-
-                    const SizedBox(height: 12),
-
                     /// LOGIN BUTTON
                     ElevatedButton(
                       onPressed: _isLoading ? null : _login,
@@ -176,7 +199,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text("Log in"),
                     ),

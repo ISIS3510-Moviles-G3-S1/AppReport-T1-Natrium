@@ -27,7 +27,7 @@ class RealNotificationService implements NotificationService {
   @override
   Future<void> initialize() async {
     const androidSettings =
-        AndroidInitializationSettings('app_icon');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
