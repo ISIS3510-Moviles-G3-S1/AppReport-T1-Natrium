@@ -130,30 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Consumer<SessionViewModel>(
-                          builder: (context, session, _) => SizedBox(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        spacing: 12,
+                        children: [
+                          SizedBox(
                             height: 34,
-                            child: OutlinedButton.icon(
-                              onPressed: session.isLoading
-                                  ? null
-                                  : () async {
-                                      await session.signOut();
-                                    },
-                              icon: session.isLoading
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.logout_rounded, size: 18),
-                              label: const Text('Log out', style: TextStyle(fontSize: 13)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.deepGreen,
-                                side: BorderSide(color: AppTheme.deepGreen.withOpacity(0.5)),
+                            child: FilledButton.icon(
+                              onPressed: () => context.go('/inbox'),
+                              icon: const Icon(Icons.mail, size: 18),
+                              label: const Text('Inbox', style: TextStyle(fontSize: 13)),
+                              style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 minimumSize: const Size(88, 34),
                                 shape: RoundedRectangleBorder(
@@ -162,7 +149,38 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                        ),
+                          Consumer<SessionViewModel>(
+                            builder: (context, session, _) => SizedBox(
+                              height: 34,
+                              child: OutlinedButton.icon(
+                                onPressed: session.isLoading
+                                    ? null
+                                    : () async {
+                                        await session.signOut();
+                                      },
+                                icon: session.isLoading
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.logout_rounded, size: 18),
+                                label: const Text('Log out', style: TextStyle(fontSize: 13)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppTheme.deepGreen,
+                                  side: BorderSide(color: AppTheme.deepGreen.withOpacity(0.5)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  minimumSize: const Size(88, 34),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
                       Image.asset(

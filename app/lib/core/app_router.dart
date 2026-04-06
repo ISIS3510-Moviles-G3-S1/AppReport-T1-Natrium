@@ -12,6 +12,8 @@ import '../views/screens/activity_listings_screen.dart';
 import '../views/screens/not_found_screen.dart';
 import '../views/screens/login_screen.dart';
 import '../views/screens/register_screen.dart';
+import '../views/screens/chat_screen.dart';
+import '../views/screens/inbox_screen.dart';
 
 // Widgets
 import 'package:uni_market/views/widgets/main_shell.dart';
@@ -19,6 +21,7 @@ import 'package:uni_market/views/widgets/main_shell.dart';
 // ViewModels
 import 'package:uni_market/view_models/item_detail_view_model.dart';
 import 'package:uni_market/view_models/session_view_model.dart';
+import 'package:uni_market/view_models/chat_view_model.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -79,6 +82,49 @@ GoRouter createAppRouter(SessionViewModel session) {
       GoRoute(
         path: '/register',
         builder: (_, __) => const RegisterScreen(),
+      ),
+
+      /// CHAT
+      GoRoute(
+        path: '/chat/:conversationId/:otherUserId/:otherUserName/:itemName',
+        builder: (context, state) {
+          final conversationId = state.pathParameters['conversationId']!;
+          final otherUserId = state.pathParameters['otherUserId']!;
+          final otherUserName = state.pathParameters['otherUserName']!;
+          final itemName = Uri.decodeComponent(state.pathParameters['itemName']!);
+          return ChangeNotifierProvider(
+            create: (_) => ChatViewModel(
+              conversationId: conversationId,
+              otherUserId: otherUserId,
+              otherUserName: otherUserName,
+              itemName: itemName,
+            ),
+            child: ChatScreen(
+              conversationId: conversationId,
+              otherUserId: otherUserId,
+              otherUserName: otherUserName,
+              itemName: itemName,
+            ),
+          );
+        },
+      ),
+
+      /// INBOX
+      GoRoute(
+        path: '/inbox',
+        builder: (_, __) => const InboxScreen(),
+      ),
+
+      /// ITEM DETAIL
+      GoRoute(
+        path: '/item/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ChangeNotifierProvider(
+            create: (_) => ItemDetailViewModel()..loadItem(id),
+            child: const ItemDetailScreen(),
+          );
+        },
       ),
 
       /// MAIN APP

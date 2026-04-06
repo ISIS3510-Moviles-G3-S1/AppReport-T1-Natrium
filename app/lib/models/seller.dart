@@ -1,4 +1,5 @@
 class Seller {
+  final String id;
   final String name;
   final String university;
   final double rating;
@@ -7,6 +8,7 @@ class Seller {
   final bool verified;
 
   const Seller({
+    required this.id,
     required this.name,
     required this.university,
     required this.rating,
