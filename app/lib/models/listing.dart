@@ -79,7 +79,11 @@ class Listing {
   bool get isSold => listingStatus == ListingStatus.sold;
   bool get isActive => listingStatus == ListingStatus.active;
 
-  Listing copyWith({bool? saved}) => Listing(
+  Listing copyWith({
+    bool? saved,
+    String? status,
+    DateTime? soldAt,
+  }) => Listing(
     id: id,
     sellerId: sellerId,
     title: title,
@@ -92,10 +96,10 @@ class Listing {
     rating: rating,
     imageName: imageName,
     createdAt: createdAt,
-    soldAt: soldAt,
+    soldAt: soldAt ?? this.soldAt,
     imagePath: imagePath,
     imageURLs: imageURLs,
-    status: status,
+    status: status ?? this.status,
     saved: saved ?? this.saved,
   );
 

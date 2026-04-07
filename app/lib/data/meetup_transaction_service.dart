@@ -59,6 +59,27 @@ class MeetupTransactionService {
       );
     }
 
+    final listingStatus = (listingData['status'] as String?)?.toLowerCase() ?? '';
+    if (listingStatus == 'sold') {
+      throw const MeetupTransactionException(
+        code: 'already-sold',
+        message: 'This item is already sold. You cannot generate a new QR code.',
+      );
+    }
+
+    final alreadyConfirmed = await _db
+        .collection(_collection)
+        .where('listingId', isEqualTo: listingId)
+        .where('status', isEqualTo: meetupStatusToString(MeetupTransactionStatus.confirmed))
+        .limit(1)
+        .get();
+    if (alreadyConfirmed.docs.isNotEmpty) {
+      throw const MeetupTransactionException(
+        code: 'already-sold',
+        message: 'This item is already sold. You cannot generate a new QR code.',
+      );
+    }
+
     final docRef = _db.collection(_collection).doc();
     await docRef.set({
       'transactionId': docRef.id,

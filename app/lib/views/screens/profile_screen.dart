@@ -168,6 +168,42 @@ class ProfileScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Consumer<SessionViewModel>(
+                  builder: (context, sessionVm, _) {
+                    final uid = sessionVm.currentUser?.uid ?? 'Not available';
+                    return Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'My UID',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? colorScheme.onSurface : AppTheme.deepGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              uid,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: mutedText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: Consumer<ProfileViewModel>(
                   builder: (context, vm, _) => EcoMessageCard(
                     message: vm.ecoMessage,

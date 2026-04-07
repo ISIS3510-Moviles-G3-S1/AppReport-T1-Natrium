@@ -116,21 +116,73 @@ class _Gallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex =
+        item.images.isEmpty ? 0 : vm.activeImageIndex.clamp(0, item.images.length - 1);
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      child: AspectRatio(
-        aspectRatio: 4 / 5,
-        child:
-            item.images.isNotEmpty
-                ? CachedNetworkImage(
-                  imageUrl: item.images[0],
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
-                )
-                : Container(
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image_rounded, size: 80),
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 5,
+            child:
+                item.images.isNotEmpty
+                    ? PageView.builder(
+                      onPageChanged: vm.setActiveImage,
+                      controller: PageController(initialPage: currentIndex),
+                      itemCount: item.images.length,
+                      itemBuilder: (context, index) {
+                        return CachedNetworkImage(
+                          imageUrl: item.images[index],
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
+                        );
+                      },
+                    )
+                    : Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_rounded, size: 80),
+                    ),
+          ),
+          if (item.images.length > 1)
+            Container(
+              color: Theme.of(context).colorScheme.surface,
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              child: SizedBox(
+                height: 56,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemBuilder: (context, index) {
+                    final selected = index == currentIndex;
+                    return GestureDetector(
+                      onTap: () => vm.setActiveImage(index),
+                      child: Container(
+                        width: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: selected
+                                ? AppTheme.deepGreen
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+                            width: selected ? 2 : 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: CachedNetworkImage(
+                            imageUrl: item.images[index],
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(Icons.image_rounded, size: 16),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemCount: item.images.length,
                 ),
+              ),
+            ),
+        ],
       ),
     );
   }

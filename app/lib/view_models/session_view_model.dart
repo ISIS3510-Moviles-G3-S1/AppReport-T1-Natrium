@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/auth_failure.dart';
 import '../core/auth_service.dart';
+import '../core/analytics_service.dart';
 import '../core/notification_service.dart';
 import '../models/app_user.dart';
 import '../data/listing_service.dart';
@@ -229,6 +230,14 @@ class SessionViewModel extends ChangeNotifier {
   /// =========================
   void _setUser(AppUser? user) {
     _currentUser = user;
+    
+    // Sync user ID with analytics service
+    if (user != null) {
+      AnalyticsService.instance.setUserId(user.uid);
+    } else {
+      AnalyticsService.instance.reset();
+    }
+    
     notifyListeners();
   }
 

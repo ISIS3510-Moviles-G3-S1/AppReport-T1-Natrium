@@ -25,6 +25,17 @@ class ItemDetailViewModel extends ChangeNotifier {
   Future<void> loadItem(String id) async {
     final listing = await _listingService.getListingById(id);
     if (listing != null) {
+        final allImages = [
+          ...listing.imageURLs.where((url) => url.trim().isNotEmpty),
+          if (listing.imagePath.trim().isNotEmpty) listing.imagePath.trim(),
+        ];
+        final uniqueImages = <String>[];
+        for (final image in allImages) {
+          if (!uniqueImages.contains(image)) {
+            uniqueImages.add(image);
+          }
+        }
+
         _item = ItemDetail(
           id: id,
           sellerId: listing.sellerId,
@@ -35,7 +46,7 @@ class ItemDetailViewModel extends ChangeNotifier {
           seller: Seller(id: listing.sellerId, name: listing.sellerName, university: '', rating: listing.rating, sales: 0, avatar: '', verified: false),
           aiScore: 0,
           description: listing.description,
-          images: listing.imageURLs.isNotEmpty ? [listing.imageURLs[0]] : [listing.imagePath],
+          images: uniqueImages,
           tags: listing.tags,
         );
 

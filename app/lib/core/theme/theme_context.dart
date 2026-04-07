@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../analytics_service.dart';
+import '../analytics_event.dart';
 import 'theme_strategy.dart';
 import 'day_theme_strategy.dart';
 import 'night_theme_strategy.dart';
@@ -20,6 +22,7 @@ import 'night_theme_strategy.dart';
 ///   4. Expose [setStrategy] so callers can inject a manual override
 ///      (user preference, ambient-light sensor, battery-saving mode, etc.)
 ///      without touching any other class.
+///   5. Track theme switches in analytics for BigQuery reporting.
 ///
 /// Extends [ChangeNotifier] so that the Flutter widget tree is rebuilt
 /// automatically whenever the active strategy changes.
@@ -41,6 +44,12 @@ class ThemeContext extends ChangeNotifier {
   /// `true` while a manual strategy override is in effect.
   bool _manualOverride = false;
 
+  /// `true` after the initial theme has been set (prevents duplicate init events).
+  bool _isInitialized = false;
+
+  /// Cached analytics service for tracking theme changes.
+  final AnalyticsService _analytics = AnalyticsService.instance;
+
   /// Creates a [ThemeContext] with an optional custom [strategies] list.
   ///
   /// If [strategies] is omitted the default list is
@@ -59,6 +68,8 @@ class ThemeContext extends ChangeNotifier {
           DateTime.now(),
         ) {
     _startPolling();
+    // Fire session initialization event on next frame
+    Future.microtask(() => _fireSessionInitializedEvent());
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -88,8 +99,18 @@ class ThemeContext extends ChangeNotifier {
   /// context.read<ThemeContext>().setStrategy(NightThemeStrategy());
   /// ```
   void setStrategy(ThemeStrategy strategy) {
+    final previousTheme = _getThemeName(_currentStrategy);
+    final newTheme = _getThemeName(strategy);
+
     _manualOverride = true;
     _pollingTimer?.cancel();
+
+    // Fire manual override event BEFORE applying the new strategy
+    _fireManualOverrideEvent(
+      fromTheme: previousTheme,
+      toTheme: newTheme,
+    );
+
     _applyStrategy(strategy);
   }
 
@@ -123,6 +144,13 @@ class ThemeContext extends ChangeNotifier {
     );
   }
 
+  /// Converts a [ThemeStrategy] to a human-readable theme name.
+  String _getThemeName(ThemeStrategy strategy) {
+    if (strategy is DayThemeStrategy) return 'light';
+    if (strategy is NightThemeStrategy) return 'dark';
+    return 'unknown';
+  }
+
   /// Starts a one-minute polling timer that re-evaluates the active
   /// strategy on every tick.
   void _startPolling() {
@@ -137,6 +165,15 @@ class ThemeContext extends ChangeNotifier {
   void _autoSwitch() {
     final best = _resolve(_autoStrategies, DateTime.now());
     if (best.runtimeType != _currentStrategy.runtimeType) {
+      final previousTheme = _getThemeName(_currentStrategy);
+      final newTheme = _getThemeName(best);
+
+      // Fire automatic switch event BEFORE applying the new strategy
+      _fireAutoSwitchEvent(
+        fromTheme: previousTheme,
+        toTheme: newTheme,
+      );
+
       _applyStrategy(best);
     }
   }
@@ -145,6 +182,66 @@ class ThemeContext extends ChangeNotifier {
   void _applyStrategy(ThemeStrategy strategy) {
     _currentStrategy = strategy;
     notifyListeners();
+  }
+
+  // ─── Analytics Events ──────────────────────────────────────────────────────
+
+  /// Fires the session initialization event (once per session).
+  void _fireSessionInitializedEvent() {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    final now = DateTime.now();
+    final themeName = _getThemeName(_currentStrategy);
+
+    _analytics.track(
+      AnalyticsEvent.sessionThemeInitialized(
+        sessionId: _analytics.sessionId,
+        userId: _analytics.currentUserId,
+        initialTheme: themeName,
+        hourOfDay: now.hour,
+        timestamp: now.toIso8601String(),
+      ),
+    );
+  }
+
+  /// Fires an event when an automatic (time-based) theme switch occurs.
+  void _fireAutoSwitchEvent({
+    required String fromTheme,
+    required String toTheme,
+  }) {
+    final now = DateTime.now();
+
+    _analytics.track(
+      AnalyticsEvent.themeAutoSwitched(
+        sessionId: _analytics.sessionId,
+        userId: _analytics.currentUserId,
+        fromTheme: fromTheme,
+        toTheme: toTheme,
+        hourOfDay: now.hour,
+        timestamp: now.toIso8601String(),
+        switchReason: 'time_based',
+      ),
+    );
+  }
+
+  /// Fires an event when a manual theme override is applied.
+  void _fireManualOverrideEvent({
+    required String fromTheme,
+    required String toTheme,
+  }) {
+    final now = DateTime.now();
+
+    _analytics.track(
+      AnalyticsEvent.themeManualOverride(
+        sessionId: _analytics.sessionId,
+        userId: _analytics.currentUserId,
+        fromTheme: fromTheme,
+        toTheme: toTheme,
+        overrideReason: 'user_preference',
+        timestamp: now.toIso8601String(),
+      ),
+    );
   }
 
   @override
