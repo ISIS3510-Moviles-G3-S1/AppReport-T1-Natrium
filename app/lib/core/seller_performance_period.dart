@@ -1,5 +1,5 @@
 /// Periods used to answer the seller-performance Type 2 business question.
-enum SellerPerformancePeriod { currentMonth, last30Days }
+enum SellerPerformancePeriod { currentMonth, last15Days }
 
 class SellerPerformanceWindow {
   final DateTime start;
@@ -13,8 +13,8 @@ extension SellerPerformancePeriodX on SellerPerformancePeriod {
     switch (this) {
       case SellerPerformancePeriod.currentMonth:
         return 'This month';
-      case SellerPerformancePeriod.last30Days:
-        return 'Last 30 days';
+      case SellerPerformancePeriod.last15Days:
+        return 'Last 15 days';
     }
   }
 
@@ -22,8 +22,8 @@ extension SellerPerformancePeriodX on SellerPerformancePeriod {
     switch (this) {
       case SellerPerformancePeriod.currentMonth:
         return 'this month';
-      case SellerPerformancePeriod.last30Days:
-        return 'in the last 30 days';
+      case SellerPerformancePeriod.last15Days:
+        return 'in the last 15 days';
     }
   }
 
@@ -35,9 +35,9 @@ extension SellerPerformancePeriodX on SellerPerformancePeriod {
           start: DateTime(now.year, now.month, 1),
           end: now,
         );
-      case SellerPerformancePeriod.last30Days:
+      case SellerPerformancePeriod.last15Days:
         return SellerPerformanceWindow(
-          start: now.subtract(const Duration(days: 30)),
+          start: now.subtract(const Duration(days: 15)),
           end: now,
         );
     }

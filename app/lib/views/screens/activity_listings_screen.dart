@@ -151,9 +151,7 @@ class ActivityListingsScreen extends StatelessWidget {
                           }
 
                           final listing = vm.listings[i];
-                            final statusLabel = listing.status.isEmpty
-                              ? 'Unknown'
-                              : listing.status[0].toUpperCase() + listing.status.substring(1);
+                          final statusLabel = listing.isSold ? 'Sold' : 'Active';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             clipBehavior: Clip.antiAlias,
@@ -182,9 +180,7 @@ class ActivityListingsScreen extends StatelessWidget {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: listing.isActive
-                                                ? AppTheme.sage
-                                                : AppTheme.muted,
+                                            color: listing.isSold ? AppTheme.muted : AppTheme.sage,
                                             borderRadius:
                                                 BorderRadius.circular(6),
                                           ),
@@ -193,9 +189,9 @@ class ActivityListingsScreen extends StatelessWidget {
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w600,
-                                              color: listing.isActive
-                                                  ? AppTheme.sageDark
-                                                  : AppTheme.mutedForeground,
+                                              color: listing.isSold
+                                                  ? AppTheme.mutedForeground
+                                                  : AppTheme.sageDark,
                                             ),
                                           ),
                                         ),

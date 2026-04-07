@@ -30,7 +30,6 @@ class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel(this._session, {EcoService? ecoService}) : _ecoService = ecoService ?? EcoService() {
     _session.addListener(_forwardSessionChanges);
     _startListingsListener();
-    _startConfirmedSalesListener();
     Future.microtask(() => _maybeGenerateEcoMessage(forceRefresh: true));
   }
 
@@ -156,28 +155,26 @@ class ProfileViewModel extends ChangeNotifier {
     }
     _listingsSub = _listingService.getListingsBySellerId(user.uid).listen((items) {
       _rawListings = items;
-      _rebuildListingsWithSalesStatus();
+      _refreshConfirmedSalesOverlay(user.uid);
       Future.microtask(_maybeGenerateEcoMessage);
     });
   }
 
-  void _startConfirmedSalesListener() {
-    _confirmedSalesSub?.cancel();
-    _confirmedSalesSub = _meetupService.watchConfirmedListingIds().listen((ids) {
-      _confirmedListingIds = ids;
-      _rebuildListingsWithSalesStatus();
-      Future.microtask(_maybeGenerateEcoMessage);
-    });
-  }
-
-  void _rebuildListingsWithSalesStatus() {
-    _listings = _rawListings.map((listing) {
-      if (_confirmedListingIds.contains(listing.id)) {
-        return listing.copyWith(status: 'sold');
-      }
-      return listing;
-    }).toList();
-    notifyListeners();
+  Future<void> _refreshConfirmedSalesOverlay(String sellerId) async {
+    try {
+      final confirmedIds = await _meetupService.watchConfirmedListingIds().first;
+      _confirmedListingIds = confirmedIds;
+      _listings = _rawListings.map((listing) {
+        if (_confirmedListingIds.contains(listing.id)) {
+          return listing.copyWith(status: 'sold');
+        }
+        return listing;
+      }).toList();
+      notifyListeners();
+    } catch (_) {
+      _listings = _rawListings;
+      notifyListeners();
+    }
   }
 
   void _forwardSessionChanges() {
@@ -322,7 +319,6 @@ class ProfileViewModel extends ChangeNotifier {
   void dispose() {
     _session.removeListener(_forwardSessionChanges);
     _listingsSub?.cancel();
-    _confirmedSalesSub?.cancel();
     super.dispose();
   }
 }
