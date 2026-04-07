@@ -45,11 +45,13 @@ GoRouter createAppRouter(SessionViewModel session) {
       final onLogin = location == '/login';
       final onRegister = location == '/register';
 
-      /// 🔥 FIX CLAVE
       final onAuthRoute = onLogin || onRegister;
 
       /// LOADING
       if (isLoading) {
+        
+        if (onAuthRoute) return null;
+
         return onLoading ? null : '/loading';
       }
 

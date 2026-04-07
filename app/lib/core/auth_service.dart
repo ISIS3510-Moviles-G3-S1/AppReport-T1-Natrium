@@ -116,7 +116,15 @@ class AuthService {
     final doc = await docRef.get();
 
     if (doc.exists) {
-      return AppUser.fromFirestore(doc);
+      final user = AppUser.fromFirestore(doc);
+      if (user.profilePic.trim().isNotEmpty) {
+        return user;
+      }
+      final authPhoto = firebaseUser.photoURL ?? '';
+      if (authPhoto.trim().isNotEmpty) {
+        return user.copyWith(profilePic: authPhoto);
+      }
+      return user;
     }
 
     await docRef.set({

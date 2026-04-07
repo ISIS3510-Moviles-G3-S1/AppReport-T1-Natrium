@@ -10,31 +10,28 @@ import '../models/app_user.dart';
 import '../data/listing_service.dart';
 
 class SessionViewModel extends ChangeNotifier {
-    /// Notifica si el usuario lleva más de 15 días sin hacer un post o nunca ha hecho un post
-    Future<void> checkPostInactivityAndNotify() async {
-      if (currentUser == null) return;
-      final lastPostDate = await ListingService().getLastPostDate(currentUser!.uid);
-      if (lastPostDate == null) {
-        await _notificationService.showNotification(
-          title: '¡Upload your first!',
-          body: 'You haven\'t posted any items yet. Upload your first item today!',
-        );
-        return;
-      }
+  final AuthService _authService;
+  final NotificationService _notificationService;
+  StreamSubscription<User?>? _authSubscription;
 
-      final daysSinceLastPost = DateTime.now().difference(lastPostDate).inDays;
-      if (daysSinceLastPost >= 15) {
-        await _notificationService.showNotification(
-          title: '¡It\'s been a while!',
-          body: 'It\'s been more than $daysSinceLastPost days since you last posted an item. Upload a new one today!',
-        );
-      }
-    }
+  AppUser? _currentUser;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  AppUser? get currentUser => _currentUser;
+  bool get isAuthenticated => _currentUser != null;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
   SessionViewModel({
     required AuthService authService,
     required NotificationService notificationService,
   })  : _authService = authService,
         _notificationService = notificationService {
+
+    
+    _forceLogoutOnStart();
+
     _authSubscription = _authService.authStateChanges.listen(
       (user) => _handleAuthState(user),
       onError: (_, __) {
@@ -44,18 +41,15 @@ class SessionViewModel extends ChangeNotifier {
     );
   }
 
-  final AuthService _authService;
-  final NotificationService _notificationService;
-  StreamSubscription<User?>? _authSubscription;
-
-  AppUser? _currentUser;
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  AppUser? get currentUser => _currentUser;
-  bool get isAuthenticated => _currentUser != null;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
+  
+  Future<void> _forceLogoutOnStart() async {
+    try {
+      await _authService.signOut();
+      _setUser(null);
+    } catch (_) {
+      // no rompe flujo si falla
+    }
+  }
 
   /// =========================
   /// SIGN IN
@@ -65,40 +59,36 @@ class SessionViewModel extends ChangeNotifier {
     required String password,
   }) async {
     debugPrint('[SessionViewModel] Starting sign in for email: $email');
+
     _setLoading(true);
     _setError(null);
 
     try {
-      debugPrint('[SessionViewModel] Calling _authService.signIn');
       final user = await _authService.signIn(
         email: email,
         password: password,
       );
-      debugPrint('[SessionViewModel] AuthService.signIn succeeded, user: ${user.email}');
 
-      // Notifica si lleva más de 3 días sin iniciar sesión
+      /// 🔔 INACTIVITY LOGIN
       final isInactive = await checkInactivity(days: 3);
       if (isInactive) {
         await _notificationService.showNotification(
-          title: '¡We miss you!!',
-          body: 'It looks like you haven\'t been active for a while. There are new items waiting for you!',
+          title: 'We miss you!',
+          body: 'There are new items waiting for you!',
         );
       }
 
-      // Notifica si lleva más de 15 días sin postear
+      /// 🔔 INACTIVITY POST
       await checkPostInactivityAndNotify();
 
-      // Update lastLogin timestamp
       await _authService.updateLastLogin(user.uid);
 
       _setUser(user);
-      debugPrint('[SessionViewModel] Sign in completed successfully');
+
     } on AuthFailure catch (failure) {
-      debugPrint('[SessionViewModel] AuthFailure caught: ${failure.code} - ${failure.message}');
       _setError(failure.message);
-      rethrow;
+      rethrow; 
     } catch (e) {
-      debugPrint('[SessionViewModel] Unexpected error: $e');
       const failure = AuthFailure('Unable to sign in. Please try again');
       _setError(failure.message);
       throw failure;
@@ -169,10 +159,42 @@ class SessionViewModel extends ChangeNotifier {
     if (currentUser == null) return false;
 
     try {
-      return await _authService.isInactiveForDays(currentUser!.uid, days: days);
+      return await _authService.isInactiveForDays(
+        currentUser!.uid,
+        days: days,
+      );
     } catch (e) {
       debugPrint('Error checking inactivity: $e');
       return false;
+    }
+  }
+
+  /// =========================
+  /// POST INACTIVITY
+  /// =========================
+  Future<void> checkPostInactivityAndNotify() async {
+    if (currentUser == null) return;
+
+    final lastPostDate =
+        await ListingService().getLastPostDate(currentUser!.uid);
+
+    if (lastPostDate == null) {
+      await _notificationService.showNotification(
+        title: 'Upload your first!',
+        body: 'You haven’t posted any items yet.',
+      );
+      return;
+    }
+
+    final daysSinceLastPost =
+        DateTime.now().difference(lastPostDate).inDays;
+
+    if (daysSinceLastPost >= 15) {
+      await _notificationService.showNotification(
+        title: 'It’s been a while!',
+        body:
+            'It’s been more than $daysSinceLastPost days since your last post.',
+      );
     }
   }
 
@@ -196,14 +218,14 @@ class SessionViewModel extends ChangeNotifier {
     } on AuthFailure catch (failure) {
       _setError(failure.message);
     } catch (_) {
-      _setError('Unable to refresh session. Please try again');
+      _setError('Unable to refresh session');
     } finally {
       _setLoading(false);
     }
   }
 
   /// =========================
-  /// STATE HELPERS
+  /// HELPERS
   /// =========================
   void _setUser(AppUser? user) {
     _currentUser = user;

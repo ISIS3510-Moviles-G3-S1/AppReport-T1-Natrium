@@ -47,11 +47,17 @@ class AppUser {
 
   factory AppUser.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
+    final firestoreProfilePic =
+        (data['profilePic'] as String?) ??
+        (data['photoURL'] as String?) ??
+        (data['photoUrl'] as String?) ??
+        (data['avatarUrl'] as String?) ??
+        '';
     return AppUser(
       uid: (data['uid'] as String?) ?? doc.id,
       email: (data['email'] as String?) ?? '',
       displayName: (data['displayName'] as String?) ?? '',
-      profilePic: (data['profilePic'] as String?) ?? '',
+      profilePic: firestoreProfilePic,
       xpPoints: (data['xpPoints'] as num?)?.toInt() ?? 0,
       isVerified: (data['isVerified'] as bool?) ?? false,
       numTransactions: (data['numTransactions'] as num?)?.toInt() ?? 0,

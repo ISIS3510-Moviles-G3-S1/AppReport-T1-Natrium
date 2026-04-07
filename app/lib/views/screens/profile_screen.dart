@@ -15,9 +15,6 @@ import '../../models/profile_models.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  static const String _selectedAvatarUrl =
-      'https://api.dicebear.com/7.x/adventurer/png?seed=Valentina&backgroundColor=f2f2f2';
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -74,19 +71,29 @@ class ProfileScreen extends StatelessWidget {
                           border: Border.all(color: AppTheme.sage, width: 2),
                         ),
                         child: ClipOval(
-                          child: Image.network(
-                            _selectedAvatarUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFF2F2F2),
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.person_rounded,
-                                size: 34,
-                                color: AppTheme.deepGreen,
-                              ),
-                            ),
-                          ),
+                          child: vm.profileAvatar.trim().isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: vm.profileAvatar.trim(),
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: const Color(0xFFF2F2F2),
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.person_rounded,
+                                      size: 34,
+                                      color: AppTheme.deepGreen,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: const Color(0xFFF2F2F2),
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.person_rounded,
+                                    size: 34,
+                                    color: AppTheme.deepGreen,
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 16),
