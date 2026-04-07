@@ -144,19 +144,6 @@ class ProfileScreen extends StatelessWidget {
                                 color: AppTheme.sage,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Consumer<SessionViewModel>(
-                              builder: (context, sessionVm, _) {
-                                final uid = sessionVm.currentUser?.uid ?? 'Not available';
-                                return SelectableText(
-                                  'UID: $uid',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: mutedText,
-                                  ),
-                                );
-                              },
-                            ),
                           ],
                         ),
                       ),
