@@ -22,14 +22,17 @@ class VisionPhotoQualityResult {
 }
 
 class VisionPhotoQualityService {
-  static const String _defaultEmbeddedApiKey = 'AIzaSyCDK12s_JVFxbtv-Wyn2AkI7LdDIYtpFSY';
+  // Read from --dart-define=GOOGLE_CLOUD_VISION_API_KEY=... at build/run time.
+  static const String _visionApiKeyFromEnv = String.fromEnvironment(
+    'GOOGLE_CLOUD_VISION_API_KEY',
+  );
   static const _visionUrl = 'https://vision.googleapis.com/v1/images:annotate';
 
   final String _apiKey;
   final http.Client _httpClient;
 
   VisionPhotoQualityService({String? apiKey, http.Client? httpClient})
-      : _apiKey = (apiKey ?? _defaultEmbeddedApiKey).trim(),
+      : _apiKey = (apiKey ?? _visionApiKeyFromEnv).trim(),
         _httpClient = httpClient ?? http.Client();
 
   Future<VisionPhotoQualityResult> analyzePhoto(XFile image) async {

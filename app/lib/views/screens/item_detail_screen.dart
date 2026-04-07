@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/app_theme.dart';
 import '../../core/price_formatter.dart';
 import '../../view_models/item_detail_view_model.dart';
+import '../../view_models/session_view_model.dart';
 import '../../models/item_detail.dart';
 import '../../models/seller.dart';
 
@@ -16,7 +17,9 @@ class ItemDetailScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
     final backTextColor =
-        isDark ? colorScheme.onSurface.withValues(alpha: 0.78) : AppTheme.mutedForeground;
+        isDark
+            ? colorScheme.onSurface.withValues(alpha: 0.78)
+            : AppTheme.mutedForeground;
     return Scaffold(
       body: SafeArea(
         child: Consumer<ItemDetailViewModel>(
@@ -36,20 +39,31 @@ class ItemDetailScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () => context.go('/browse'),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 8,
+                            ),
                             child: Row(
                               children: [
                                 Icon(
                                   Icons.chevron_left_rounded,
                                   size: 20,
-                                  color: isDark ? colorScheme.onSurface.withAlpha(200) : AppTheme.mutedForeground,
+                                  color:
+                                      isDark
+                                          ? colorScheme.onSurface.withAlpha(200)
+                                          : AppTheme.mutedForeground,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Back to Browse',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: isDark ? colorScheme.onSurface.withAlpha(200) : AppTheme.mutedForeground,
+                                    color:
+                                        isDark
+                                            ? colorScheme.onSurface.withAlpha(
+                                              200,
+                                            )
+                                            : AppTheme.mutedForeground,
                                   ),
                                 ),
                               ],
@@ -106,16 +120,17 @@ class _Gallery extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: AspectRatio(
         aspectRatio: 4 / 5,
-        child: item.images.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: item.images[0],
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
-              )
-            : Container(
-                color: Colors.grey[200],
-                child: const Icon(Icons.image_rounded, size: 80),
-              ),
+        child:
+            item.images.isNotEmpty
+                ? CachedNetworkImage(
+                  imageUrl: item.images[0],
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => const Icon(Icons.image_rounded),
+                )
+                : Container(
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image_rounded, size: 80),
+                ),
       ),
     );
   }
@@ -133,11 +148,18 @@ class _InfoSection extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final bodyTextColor = isDark ? colorScheme.onSurface : AppTheme.foreground;
     final secondaryTextColor =
-      isDark ? colorScheme.onSurface.withValues(alpha: 0.76) : AppTheme.mutedForeground;
+        isDark
+            ? colorScheme.onSurface.withValues(alpha: 0.76)
+            : AppTheme.mutedForeground;
     // Chips in this section use a white background, so force dark text for readability.
     final chipTextColor = isDark ? AppTheme.black : AppTheme.foreground;
     final borderColor = isDark ? colorScheme.outline : AppTheme.foreground;
     final cardColor = isDark ? colorScheme.surface : AppTheme.cardBg;
+    final currentUserId =
+        context.read<SessionViewModel>().currentUser?.uid ?? '';
+    final isSeller = currentUserId.isNotEmpty && currentUserId == item.sellerId;
+    final canScanAsBuyer =
+        currentUserId.isNotEmpty && currentUserId != item.sellerId;
     final scoreLabel =
         item.aiScore >= 90
             ? 'Excellent'
@@ -162,19 +184,15 @@ class _InfoSection extends StatelessWidget {
             Expanded(
               child: Text(
                 item.name,
-                style: Theme.of(context).textTheme.titleLarge ??
-                    const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
+                style:
+                    Theme.of(context).textTheme.titleLarge ??
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
               ),
             ),
             IconButton(
               onPressed: () => vm.toggleSaved(context),
               icon: Icon(
-                vm.saved
-                    ? Icons.favorite
-                    : Icons.favorite_border_outlined,
+                vm.saved ? Icons.favorite : Icons.favorite_border_outlined,
                 color: vm.saved ? Colors.red : secondaryTextColor,
                 size: 22,
               ),
@@ -205,7 +223,10 @@ class _InfoSection extends StatelessWidget {
             Chip(
               label: Text(
                 item.condition,
-                style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: chipTextColor,
+                ),
               ),
               backgroundColor: AppTheme.cardBg,
               side: BorderSide(color: borderColor),
@@ -250,7 +271,10 @@ class _InfoSection extends StatelessWidget {
                   (t) => Chip(
                     label: Text(
                       t,
-                      style: TextStyle(fontWeight: FontWeight.w600, color: chipTextColor),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: chipTextColor,
+                      ),
                     ),
                     backgroundColor: AppTheme.cardBg,
                     side: BorderSide(color: borderColor),
@@ -265,7 +289,9 @@ class _InfoSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? colorScheme.outline : AppTheme.muted),
+            border: Border.all(
+              color: isDark ? colorScheme.outline : AppTheme.muted,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,9 +330,13 @@ class _InfoSection extends StatelessWidget {
               const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: item.aiScore / 100,
-                backgroundColor: isDark ? colorScheme.surfaceContainerHighest : AppTheme.gray,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(AppTheme.deepGreen),
+                backgroundColor:
+                    isDark
+                        ? colorScheme.surfaceContainerHighest
+                        : AppTheme.gray,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppTheme.deepGreen,
+                ),
                 minHeight: 8,
               ),
               const SizedBox(height: 8),
@@ -329,11 +359,7 @@ class _InfoSection extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           item.description,
-          style: TextStyle(
-            fontSize: 14,
-            height: 1.5,
-            color: bodyTextColor,
-          ),
+          style: TextStyle(fontSize: 14, height: 1.5, color: bodyTextColor),
         ),
         const SizedBox(height: 16),
         _SellerCard(seller: item.seller),
@@ -344,7 +370,9 @@ class _InfoSection extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: vm.messageSent ? null : () => vm.sendMessage(context),
                 icon: Icon(
-                  vm.messageSent ? Icons.check_circle_outline : Icons.mail_outline,
+                  vm.messageSent
+                      ? Icons.check_circle_outline
+                      : Icons.mail_outline,
                   size: 18,
                 ),
                 label: Text(
@@ -379,6 +407,28 @@ class _InfoSection extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        if (isSeller)
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed:
+                  () => context.push(
+                    '/meetup/seller/${item.id}?sellerId=${item.sellerId}',
+                  ),
+              icon: const Icon(Icons.qr_code_2),
+              label: const Text('Generate Meetup QR'),
+            ),
+          ),
+        if (canScanAsBuyer)
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.push('/meetup/scan'),
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Scan QR to Confirm Pickup'),
+            ),
+          ),
       ],
     );
   }
@@ -396,7 +446,9 @@ class _SellerCard extends StatelessWidget {
     // Seller card is white in both themes, so keep text dark for contrast.
     final bodyTextColor = AppTheme.foreground;
     final secondaryTextColor =
-        isDark ? AppTheme.black.withValues(alpha: 0.62) : AppTheme.mutedForeground;
+        isDark
+            ? AppTheme.black.withValues(alpha: 0.62)
+            : AppTheme.mutedForeground;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -471,10 +523,7 @@ class _SellerCard extends StatelessWidget {
                 ),
                 Text(
                   seller.university,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: secondaryTextColor,
-                  ),
+                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
                 ),
                 Row(
                   children: [
@@ -491,10 +540,7 @@ class _SellerCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       '${seller.sales} items sold',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: secondaryTextColor,
-                      ),
+                      style: TextStyle(fontSize: 12, color: secondaryTextColor),
                     ),
                   ],
                 ),
@@ -547,7 +593,9 @@ class _SimilarSection extends StatelessWidget {
                             child: CachedNetworkImage(
                               imageUrl: s['image'],
                               fit: BoxFit.cover,
-                              errorWidget: (context, url, error) => const Icon(Icons.image_rounded),
+                              errorWidget:
+                                  (context, url, error) =>
+                                      const Icon(Icons.image_rounded),
                             ),
                           ),
                           Padding(
@@ -565,7 +613,9 @@ class _SimilarSection extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  PriceFormatter.formatCopFromNum((s['price'] as num?) ?? 0),
+                                  PriceFormatter.formatCopFromNum(
+                                    (s['price'] as num?) ?? 0,
+                                  ),
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,

@@ -1,7 +1,3 @@
-
-// ...existing code...
-// ...existing code...
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +25,7 @@ class ItemDetailViewModel extends ChangeNotifier {
     if (listing != null) {
         _item = ItemDetail(
           id: id,
+          sellerId: listing.sellerId,
           name: listing.title,
           price: listing.price.toDouble(),
           condition: listing.conditionTag,

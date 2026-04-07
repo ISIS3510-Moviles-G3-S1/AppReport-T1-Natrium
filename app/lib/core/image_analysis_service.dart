@@ -17,14 +17,17 @@ abstract class ImageAnalysisService {
 }
 
 class CloudVisionImageAnalysisService implements ImageAnalysisService {
-  static const String _defaultEmbeddedApiKey = 'AIzaSyCDK12s_JVFxbtv-Wyn2AkI7LdDIYtpFSY';
+  // Read from --dart-define=GOOGLE_CLOUD_VISION_API_KEY=... at build/run time.
+  static const String _visionApiKeyFromEnv = String.fromEnvironment(
+    'GOOGLE_CLOUD_VISION_API_KEY',
+  );
 
   CloudVisionImageAnalysisService({
     String? apiKey,
     http.Client? httpClient,
     ClothingCategoryMapper? categoryMapper,
     ImageAnalysisService? fallbackService,
-  })  : _apiKey = (apiKey ?? _defaultEmbeddedApiKey).trim(),
+  })  : _apiKey = (apiKey ?? _visionApiKeyFromEnv).trim(),
         _httpClient = httpClient ?? http.Client(),
         _categoryMapper = categoryMapper ?? ClothingCategoryMapper(),
         _fallbackService = fallbackService ?? MockClothingAnalysisService();

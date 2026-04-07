@@ -12,6 +12,8 @@ import '../views/screens/activity_listings_screen.dart';
 import '../views/screens/not_found_screen.dart';
 import '../views/screens/login_screen.dart';
 import '../views/screens/register_screen.dart';
+import '../views/screens/meetup_generate_qr_screen.dart';
+import '../views/screens/meetup_scan_qr_screen.dart';
 import '../views/screens/chat_screen.dart';
 import '../views/screens/inbox_screen.dart';
 
@@ -32,7 +34,9 @@ GoRouter createAppRouter(SessionViewModel session) {
 
     redirect: (context, state) {
       final location =
-          state.matchedLocation.isEmpty ? state.uri.path : state.matchedLocation;
+          state.matchedLocation.isEmpty
+              ? state.uri.path
+              : state.matchedLocation;
 
       final isLoading = session.isLoading;
       final isAuth = session.isAuthenticated;
@@ -68,21 +72,17 @@ GoRouter createAppRouter(SessionViewModel session) {
       /// LOADING
       GoRoute(
         path: '/loading',
-        builder: (_, __) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        builder:
+            (_, __) => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
       ),
 
       /// LOGIN
-      GoRoute(
-        path: '/login',
-        builder: (_, __) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
 
       /// REGISTER ✅ (YA PERMITIDO)
-      GoRoute(
-        path: '/register',
-        builder: (_, __) => const RegisterScreen(),
-      ),
+      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
 
       /// CHAT
       GoRoute(
@@ -129,15 +129,17 @@ GoRouter createAppRouter(SessionViewModel session) {
 
       /// MAIN APP
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) =>
-            MainShell(navigationShell: navigationShell),
+        builder:
+            (context, state, navigationShell) =>
+                MainShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: HomeScreen()),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: HomeScreen()),
               ),
             ],
           ),
@@ -145,8 +147,9 @@ GoRouter createAppRouter(SessionViewModel session) {
             routes: [
               GoRoute(
                 path: '/browse',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: BrowseScreen()),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: BrowseScreen()),
               ),
             ],
           ),
@@ -154,8 +157,9 @@ GoRouter createAppRouter(SessionViewModel session) {
             routes: [
               GoRoute(
                 path: '/sell',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: SellScreen()),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: SellScreen()),
               ),
             ],
           ),
@@ -163,8 +167,9 @@ GoRouter createAppRouter(SessionViewModel session) {
             routes: [
               GoRoute(
                 path: '/activity-listings',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: ActivityListingsScreen()),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: ActivityListingsScreen()),
               ),
             ],
           ),
@@ -172,8 +177,9 @@ GoRouter createAppRouter(SessionViewModel session) {
             routes: [
               GoRoute(
                 path: '/profile',
-                pageBuilder: (context, state) =>
-                    const NoTransitionPage(child: ProfileScreen()),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: ProfileScreen()),
               ),
             ],
           ),
@@ -183,6 +189,31 @@ GoRouter createAppRouter(SessionViewModel session) {
       // Removed swap and donate routes
 
       // Rutas swap y donate eliminadas
+      GoRoute(
+        path: '/item/:id',
+        builder: (context, state) {
+          final listingId = state.pathParameters['id'] ?? '';
+          return ChangeNotifierProvider(
+            create: (_) => ItemDetailViewModel()..loadItem(listingId),
+            child: const ItemDetailScreen(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/meetup/seller/:listingId',
+        builder: (context, state) {
+          final listingId = state.pathParameters['listingId'] ?? '';
+          final sellerId = state.uri.queryParameters['sellerId'] ?? '';
+          return MeetupGenerateQrScreen(
+            listingId: listingId,
+            sellerId: sellerId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/meetup/scan',
+        builder: (_, __) => const MeetupScanQrScreen(),
+      ),
     ],
   );
 }
