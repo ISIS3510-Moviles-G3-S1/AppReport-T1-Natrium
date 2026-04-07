@@ -7,6 +7,7 @@ import '../models/profile_models.dart';
 import '../models/listing.dart';
 import '../core/eco_service.dart';
 import '../data/listing_service.dart';
+import '../data/meetup_transaction_service.dart';
 import 'session_view_model.dart';
 
 class EcoLevelInfo {
@@ -29,14 +30,19 @@ class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel(this._session, {EcoService? ecoService}) : _ecoService = ecoService ?? EcoService() {
     _session.addListener(_forwardSessionChanges);
     _startListingsListener();
+    _startConfirmedSalesListener();
     Future.microtask(() => _maybeGenerateEcoMessage(forceRefresh: true));
   }
 
   final SessionViewModel _session;
   final EcoService _ecoService;
   final ListingService _listingService = ListingService();
+  final MeetupTransactionService _meetupService = MeetupTransactionService();
   StreamSubscription<List<Listing>>? _listingsSub;
+  StreamSubscription<Set<String>>? _confirmedSalesSub;
   List<Listing> _listings = [];
+  List<Listing> _rawListings = [];
+  Set<String> _confirmedListingIds = {};
   String _ecoMessage = '';
   bool _isGeneratingEcoMessage = false;
   String? _lastEcoRequestHash;
@@ -138,6 +144,8 @@ class ProfileViewModel extends ChangeNotifier {
     _listingsSub?.cancel();
     final user = _user;
     if (user == null) {
+      _rawListings = [];
+      _confirmedListingIds = {};
       _listings = [];
       _ecoMessage = '';
       _isGeneratingEcoMessage = false;
@@ -147,10 +155,29 @@ class ProfileViewModel extends ChangeNotifier {
       return;
     }
     _listingsSub = _listingService.getListingsBySellerId(user.uid).listen((items) {
-      _listings = items;
-      notifyListeners();
+      _rawListings = items;
+      _rebuildListingsWithSalesStatus();
       Future.microtask(_maybeGenerateEcoMessage);
     });
+  }
+
+  void _startConfirmedSalesListener() {
+    _confirmedSalesSub?.cancel();
+    _confirmedSalesSub = _meetupService.watchConfirmedListingIds().listen((ids) {
+      _confirmedListingIds = ids;
+      _rebuildListingsWithSalesStatus();
+      Future.microtask(_maybeGenerateEcoMessage);
+    });
+  }
+
+  void _rebuildListingsWithSalesStatus() {
+    _listings = _rawListings.map((listing) {
+      if (_confirmedListingIds.contains(listing.id)) {
+        return listing.copyWith(status: 'sold');
+      }
+      return listing;
+    }).toList();
+    notifyListeners();
   }
 
   void _forwardSessionChanges() {
@@ -295,6 +322,7 @@ class ProfileViewModel extends ChangeNotifier {
   void dispose() {
     _session.removeListener(_forwardSessionChanges);
     _listingsSub?.cancel();
+    _confirmedSalesSub?.cancel();
     super.dispose();
   }
 }

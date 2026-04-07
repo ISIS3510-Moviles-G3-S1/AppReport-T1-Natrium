@@ -6,6 +6,7 @@ import '../core/analytics_event.dart';
 import '../core/analytics_service.dart';
 import '../models/listing.dart';
 import '../data/listing_service.dart';
+import '../data/meetup_transaction_service.dart';
 
 
 import '../core/recommendation_service.dart';
@@ -17,7 +18,10 @@ class BrowseViewModel extends ChangeNotifier {
   List<Listing> _listings = [];
   List<Listing> _allListings = [];
   late ListingService _listingService;
+  final MeetupTransactionService _meetupService = MeetupTransactionService();
   StreamSubscription<List<Listing>>? _listingsSub;
+  StreamSubscription<Set<String>>? _confirmedSalesSub;
+  Set<String> _confirmedListingIds = {};
   final Map<String, bool> _savedItems = {};
   String _search = '';
   String _category = 'All';
@@ -53,6 +57,7 @@ class BrowseViewModel extends ChangeNotifier {
   BrowseViewModel() {
     _listingService = ListingService();
     _listenListings();
+    _listenConfirmedSales();
   }
 
   void _listenListings() {
@@ -62,10 +67,19 @@ class BrowseViewModel extends ChangeNotifier {
     });
   }
 
+  void _listenConfirmedSales() {
+    _confirmedSalesSub = _meetupService.watchConfirmedListingIds().listen((ids) {
+      _confirmedListingIds = ids;
+      _recomputeVisibleListings();
+    });
+  }
+
   void _recomputeVisibleListings() {
-    _listings = _allListings
-        .where((listing) => !listing.isSold)
-        .toList();
+    _listings =
+        _allListings
+            .where((listing) => !listing.isSold)
+            .where((listing) => !_confirmedListingIds.contains(listing.id))
+            .toList();
 
     for (final l in _listings) {
       _savedItems[l.id] = l.saved;
@@ -314,6 +328,7 @@ class BrowseViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _listingsSub?.cancel();
+    _confirmedSalesSub?.cancel();
     super.dispose();
   }
 }

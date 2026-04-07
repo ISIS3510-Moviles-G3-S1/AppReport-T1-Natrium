@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 
+import 'core/analytics_service.dart';
 import 'core/app_router.dart';
 import 'core/auth_service.dart';
 import 'core/notification_service.dart';
@@ -22,6 +23,9 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize analytics service
+  debugPrint('[Main] Analytics Service initialized. Session ID: ${AnalyticsService.instance.sessionId}');
 
   // Initialize notification service
   final notificationService = RealNotificationService();

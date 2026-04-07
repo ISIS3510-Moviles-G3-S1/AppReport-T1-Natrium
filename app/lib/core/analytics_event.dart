@@ -141,4 +141,88 @@ class AnalyticsEvent {
           'days_since_last_interaction': AnalyticsValue.int(daysSinceLastInteraction),
         },
       );
+
+  // ---------------------------------------------------------------------------
+  // Type-3 Business Question: Automatic theme switching by time-of-day
+  // ---------------------------------------------------------------------------
+
+  /// Fired when the app AUTOMATICALLY switches theme based on time-of-day context.
+  /// 
+  /// This captures automatic theme transitions (e.g., light → dark at 7 PM,
+  /// or dark → light at 6 AM) driven by the DayThemeStrategy / NightThemeStrategy
+  /// polling mechanism.
+  ///
+  /// Use this event to answer: "What percentage of UniMarket sessions
+  /// automatically switch between light and dark mode based on time-of-day context?"
+  static AnalyticsEvent themeAutoSwitched({
+    required String sessionId,           // Session ID for grouping
+    String? userId,                      // User ID if authenticated (may be null for guests)
+    required String fromTheme,           // "light" | "dark"
+    required String toTheme,             // "light" | "dark"
+    required int hourOfDay,              // 0-23: hour when switch occurred
+    required String timestamp,           // ISO-8601: exact moment of switch
+    String switchReason = 'time_based',  // "time_based" for automatic, "manual" for overrides
+  }) =>
+      AnalyticsEvent(
+        name: 'theme_auto_switched',
+        parameters: {
+          'session_id': AnalyticsValue.string(sessionId),
+          if (userId != null) 'user_id': AnalyticsValue.string(userId),
+          'from_theme': AnalyticsValue.string(fromTheme),
+          'to_theme': AnalyticsValue.string(toTheme),
+          'hour_of_day': AnalyticsValue.int(hourOfDay),
+          'timestamp': AnalyticsValue.string(timestamp),
+          'switch_reason': AnalyticsValue.string(switchReason),
+          'is_automatic': AnalyticsValue.boolType(true),
+        },
+      );
+
+  /// Fired when a user manually overrides the automatic theme selection.
+  ///
+  /// Captures manual theme changes triggered by user preference, accessibility
+  /// settings, or ambient-light detection (if implemented in future).
+  static AnalyticsEvent themeManualOverride({
+    required String sessionId,              // Session ID for grouping
+    String? userId,                         // User ID if authenticated (may be null for guests)
+    required String fromTheme,              // "light" | "dark" (the auto-selected theme before override)
+    required String toTheme,                // "light" | "dark" (user's manual selection)
+    required String overrideReason,         // "user_preference" | "accessibility" | "battery_saver" | etc.
+    required String timestamp,              // ISO-8601: exact moment of override
+  }) =>
+      AnalyticsEvent(
+        name: 'theme_manual_override',
+        parameters: {
+          'session_id': AnalyticsValue.string(sessionId),
+          if (userId != null) 'user_id': AnalyticsValue.string(userId),
+          'from_theme': AnalyticsValue.string(fromTheme),
+          'to_theme': AnalyticsValue.string(toTheme),
+          'override_reason': AnalyticsValue.string(overrideReason),
+          'timestamp': AnalyticsValue.string(timestamp),
+          'is_automatic': AnalyticsValue.boolType(false),
+        },
+      );
+
+  /// Fired once per session to record the initial (baseline) theme choice
+  /// when the app starts.
+  ///
+  /// Useful for understanding:
+  ///   - Which theme users see on app launch (based on time of day)
+  ///   - Device-to-device distribution of light vs. dark theme starts
+  static AnalyticsEvent sessionThemeInitialized({
+    required String sessionId,     // Session ID for grouping
+    String? userId,                // User ID if authenticated
+    required String initialTheme,  // "light" | "dark"
+    required int hourOfDay,        // 0-23: hour when session started
+    required String timestamp,     // ISO-8601: app launch time
+  }) =>
+      AnalyticsEvent(
+        name: 'session_theme_initialized',
+        parameters: {
+          'session_id': AnalyticsValue.string(sessionId),
+          if (userId != null) 'user_id': AnalyticsValue.string(userId),
+          'initial_theme': AnalyticsValue.string(initialTheme),
+          'hour_of_day': AnalyticsValue.int(hourOfDay),
+          'timestamp': AnalyticsValue.string(timestamp),
+        },
+      );
 }

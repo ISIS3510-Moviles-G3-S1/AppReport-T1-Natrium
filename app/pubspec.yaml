@@ -52,6 +52,7 @@ dependencies:
 
   # Added for photo quality analysis
   image: ^3.2.2
+  uuid: ^4.0.0
 
 dev_dependencies:
   flutter_test:
