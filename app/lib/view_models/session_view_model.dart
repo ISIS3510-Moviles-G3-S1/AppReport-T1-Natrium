@@ -64,14 +64,17 @@ class SessionViewModel extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
+    debugPrint('[SessionViewModel] Starting sign in for email: $email');
     _setLoading(true);
     _setError(null);
 
     try {
+      debugPrint('[SessionViewModel] Calling _authService.signIn');
       final user = await _authService.signIn(
         email: email,
         password: password,
       );
+      debugPrint('[SessionViewModel] AuthService.signIn succeeded, user: ${user.email}');
 
       // Notifica si lleva más de 3 días sin iniciar sesión
       final isInactive = await checkInactivity(days: 3);
@@ -89,10 +92,13 @@ class SessionViewModel extends ChangeNotifier {
       await _authService.updateLastLogin(user.uid);
 
       _setUser(user);
+      debugPrint('[SessionViewModel] Sign in completed successfully');
     } on AuthFailure catch (failure) {
+      debugPrint('[SessionViewModel] AuthFailure caught: ${failure.code} - ${failure.message}');
       _setError(failure.message);
       rethrow;
     } catch (e) {
+      debugPrint('[SessionViewModel] Unexpected error: $e');
       const failure = AuthFailure('Unable to sign in. Please try again');
       _setError(failure.message);
       throw failure;
