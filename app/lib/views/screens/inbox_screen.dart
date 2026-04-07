@@ -33,7 +33,7 @@ class _InboxScreenState extends State<InboxScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => context.go('/'),
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -57,8 +57,37 @@ class _InboxScreenState extends State<InboxScreen> {
 
           final conversations = snapshot.data?.docs ?? [];
 
+          // Group conversations by participant pairs and keep only the most recent one
+          final Map<String, QueryDocumentSnapshot> uniqueConversations = {};
+          
+          for (final doc in conversations) {
+            final data = doc.data() as Map<String, dynamic>;
+            final participants = data['participants'] as List<dynamic>? ?? [];
+            final sortedParticipants = participants.map((p) => p.toString()).toList()..sort();
+            final pairKey = sortedParticipants.join('_');
+            
+            // Keep the conversation with the most recent message, or any conversation if none have messages
+            final existingDoc = uniqueConversations[pairKey];
+            if (existingDoc == null) {
+              uniqueConversations[pairKey] = doc;
+            } else {
+              final existingData = existingDoc.data() as Map<String, dynamic>;
+              final existingTimestamp = existingData['lastMessageAt'] as Timestamp?;
+              final currentTimestamp = data['lastMessageAt'] as Timestamp?;
+              
+              // If current has a timestamp and existing doesn't, or current is more recent
+              if ((currentTimestamp != null && existingTimestamp == null) ||
+                  (currentTimestamp != null && existingTimestamp != null && 
+                   currentTimestamp.compareTo(existingTimestamp) > 0)) {
+                uniqueConversations[pairKey] = doc;
+              }
+            }
+          }
+
+          final uniqueConversationList = uniqueConversations.values.toList();
+
           // Sort conversations by lastMessageAt in memory
-          conversations.sort((a, b) {
+          uniqueConversationList.sort((a, b) {
             final aData = a.data() as Map<String, dynamic>;
             final bData = b.data() as Map<String, dynamic>;
             final aTimestamp = aData['lastMessageAt'] as Timestamp?;
@@ -71,7 +100,7 @@ class _InboxScreenState extends State<InboxScreen> {
             return bTimestamp.compareTo(aTimestamp); // descending order
           });
 
-          if (conversations.isEmpty) {
+          if (uniqueConversationList.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -98,13 +127,13 @@ class _InboxScreenState extends State<InboxScreen> {
           }
 
           return ListView.separated(
-            itemCount: conversations.length,
+            itemCount: uniqueConversationList.length,
             separatorBuilder: (_, __) => Divider(
               height: 1,
               color: Colors.grey[300],
             ),
             itemBuilder: (context, index) {
-              final doc = conversations[index];
+              final doc = uniqueConversationList[index];
               final data = doc.data() as Map<String, dynamic>;
               final participants = data['participants'] as List<dynamic>? ?? [];
               final otherUserId = participants.firstWhere(

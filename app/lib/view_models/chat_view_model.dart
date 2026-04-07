@@ -41,8 +41,40 @@ class ChatViewModel extends ChangeNotifier {
       await _firestore.collection('conversations').doc(conversationId).set({
         'participants': [currentUser.uid, otherUserId],
       }, SetOptions(merge: true));
+      
+      // Update conversation metadata with latest message info
+      await updateConversationMetadata();
     } catch (e, stack) {
       debugPrint('[ChatViewModel] ensureConversationExists failed: $e');
+      debugPrint(stack.toString());
+    }
+  }
+
+  Future<void> updateConversationMetadata() async {
+    try {
+      // Get the most recent message
+      final messagesQuery = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .orderBy('sentAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (messagesQuery.docs.isNotEmpty) {
+        final latestMessage = messagesQuery.docs.first;
+        final messageData = latestMessage.data();
+        
+        await _firestore.collection('conversations').doc(conversationId).set({
+          'lastMessageText': messageData['text'] ?? '',
+          'lastMessageAt': messageData['sentAt'],
+          'itemName': itemName,
+        }, SetOptions(merge: true));
+        
+        debugPrint('[ChatViewModel] Updated conversation metadata for $conversationId');
+      }
+    } catch (e, stack) {
+      debugPrint('[ChatViewModel] updateConversationMetadata failed: $e');
       debugPrint(stack.toString());
     }
   }
@@ -64,28 +96,30 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     try {
-      // Ensure conversation document exists
-      debugPrint('[ChatViewModel] Creating/updating conversation $conversationId with participants [$currentUser.uid, $otherUserId]');
+      final messageData = {
+        'senderId': currentUser.uid,
+        'text': text,
+        'imageURLs': [],
+        'type': 'text',
+        'sentAt': Timestamp.now(),
+        'status': 'sent',
+      };
+
+      // Update conversation document with last message info
+      debugPrint('[ChatViewModel] Updating conversation $conversationId with last message info');
       await _firestore.collection('conversations').doc(conversationId).set({
         'participants': [currentUser.uid, otherUserId],
+        'lastMessageText': text,
+        'lastMessageAt': messageData['sentAt'],
+        'itemName': itemName,
       }, SetOptions(merge: true));
 
-      final message = Message(
-        id: '', // Firestore will generate
-        senderId: currentUser.uid,
-        text: text,
-        imageURLs: [],
-        type: 'text',
-        sentAt: Timestamp.now(),
-        status: 'sent',
-      );
-
-      debugPrint('[ChatViewModel] Adding message to conversation $conversationId: ${message.toFirestore()}');
+      debugPrint('[ChatViewModel] Adding message to conversation $conversationId: $messageData');
       await _firestore
           .collection('conversations')
           .doc(conversationId)
           .collection('messages')
-          .add(message.toFirestore());
+          .add(messageData);
       debugPrint('[ChatViewModel] Message send completed successfully.');
     } catch (e, stack) {
       debugPrint('[ChatViewModel] Error sending message: $e');

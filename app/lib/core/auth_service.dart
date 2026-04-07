@@ -22,20 +22,27 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    debugPrint('[AuthService] signIn called with email: $email');
+
     // For testing: simulate auth failure
     if (email == "test@error.com") {
+      debugPrint('[AuthService] Test error email detected, throwing AuthFailure');
       throw const AuthFailure('Invalid credentials', code: 'invalid-credential');
     }
 
     try {
+      debugPrint('[AuthService] Calling Firebase signInWithEmailAndPassword');
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      debugPrint('[AuthService] Firebase signInWithEmailAndPassword succeeded');
       return await _hydrateUser(credential.user!);
     } on FirebaseAuthException catch (e) {
+      debugPrint('[AuthService] FirebaseAuthException caught: ${e.code} - ${e.message}');
       throw AuthFailure.fromFirebaseException(e);
     } catch (e) {
+      debugPrint('[AuthService] Unexpected error in signIn: $e');
       throw const AuthFailure('Unable to sign in. Please try again');
     }
   }
