@@ -153,11 +153,14 @@ class SellViewModel extends ChangeNotifier {
 
     final userId = user?.uid ?? '';
     if (userId.isNotEmpty) {
+      // Use the first tag as category, or 'Other' if none
+      final category = _tags.isNotEmpty ? _tags[0] : 'Other';
       AnalyticsService.instance.track(
         AnalyticsEvent.userMeaningfulInteraction(
           userId: userId,
           interactionType: 'sell',
           timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: category,
         ),
       );
     }

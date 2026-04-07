@@ -48,6 +48,7 @@ dependencies:
   palette_generator: ^0.3.3+6
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.2
+  string_similarity: ^2.0.0
 
   # Added for photo quality analysis
   image: ^3.2.2

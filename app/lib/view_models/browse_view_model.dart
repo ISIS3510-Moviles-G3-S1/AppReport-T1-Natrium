@@ -1,3 +1,4 @@
+import 'package:string_similarity/string_similarity.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +11,7 @@ import '../data/listing_service.dart';
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
 import '../core/ai_recommendation_decorator.dart';
+
 
 class BrowseViewModel extends ChangeNotifier {
   List<Listing> _listings = [];
@@ -41,6 +43,10 @@ class BrowseViewModel extends ChangeNotifier {
 
   // Track category interaction counts
   final Map<String, int> _categoryInteractionCounts = {};
+
+  // NUEVO: Track de items vistos y comprados
+  final Set<String> _viewedItemIds = {};
+  final Set<String> _purchasedItemIds = {};
 
   late RecommendationService _recommendationService;
 
@@ -84,6 +90,7 @@ class BrowseViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+
   // User favorites an item
   void toggleSave(String itemId) {
     _savedItems[itemId] = !_savedItems[itemId]!;
@@ -100,12 +107,57 @@ class BrowseViewModel extends ChangeNotifier {
             userId: userId,
             interactionType: 'like',
             timestamp: DateTime.now().toUtc().toIso8601String(),
+            category: cat,
           ),
         );
       }
     }
 
     _updateRecommendationService();
+    notifyListeners();
+  }
+
+  // NUEVO: User views an item (para recomendaciones)
+  void trackView(String itemId) {
+    _viewedItemIds.add(itemId);
+    final item = _listings.firstWhere((l) => l.id == itemId);
+    final cat = item.tags.isNotEmpty ? item.tags[0] : 'Other';
+    _categoryInteractionCounts[cat] = (_categoryInteractionCounts[cat] ?? 0) + 1;
+
+    // Analytics: track view interaction
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isNotEmpty) {
+      AnalyticsService.instance.track(
+        AnalyticsEvent.userMeaningfulInteraction(
+          userId: userId,
+          interactionType: 'view',
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: cat,
+        ),
+      );
+    }
+    notifyListeners();
+  }
+
+  // NUEVO: User purchases an item (para recomendaciones)
+  void trackPurchase(String itemId) {
+    _purchasedItemIds.add(itemId);
+    final item = _listings.firstWhere((l) => l.id == itemId);
+    final cat = item.tags.isNotEmpty ? item.tags[0] : 'Other';
+    _categoryInteractionCounts[cat] = (_categoryInteractionCounts[cat] ?? 0) + 1;
+
+    // Analytics: track purchase interaction
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isNotEmpty) {
+      AnalyticsService.instance.track(
+        AnalyticsEvent.userMeaningfulInteraction(
+          userId: userId,
+          interactionType: 'buy',
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: cat,
+        ),
+      );
+    }
     notifyListeners();
   }
 
@@ -118,8 +170,50 @@ class BrowseViewModel extends ChangeNotifier {
   }
 
 
-  // 'For You' recommendations (sin IA, síncrono)
-  List<Listing> get forYouRecommendations => _recommendationService.getRecommendations();
+  // 'For You' recommendations (favoritos + similaridad de tags)
+  List<Listing> get forYouRecommendations {
+    // 1. Obtener los favoritos, vistos y comprados
+    final favoriteIds = _savedItems.entries.where((e) => e.value).map((e) => e.key).toSet();
+    final allInteractedIds = <String>{}
+      ..addAll(favoriteIds)
+      ..addAll(_viewedItemIds)
+      ..addAll(_purchasedItemIds);
+    final interactedListings = _listings.where((l) => allInteractedIds.contains(l.id)).toList();
+
+    // 2. Obtener todos los tags de los ítems con los que interactuó
+    final interactedTags = <String>{};
+    for (final item in interactedListings) {
+      interactedTags.addAll(item.tags.where((t) => t.trim().isNotEmpty));
+    }
+
+    // LOG: Mostrar tags de interacción
+    debugPrint('[ForYou] Interacted tags: ${interactedTags.join(", ")}');
+
+    // 3. Incluir todos los ítems que tengan al menos un tag similar a los de interacción (usando similaridad de strings)
+    const double similarityThreshold = 0.6; // Puedes ajustar este valor
+    final similarListings = _listings.where((l) {
+      if (allInteractedIds.contains(l.id)) return false; // No incluir repetidos
+      for (final tag in l.tags) {
+        for (final interactedTag in interactedTags) {
+          final similarity = StringSimilarity.compareTwoStrings(
+            tag.toLowerCase(), interactedTag.toLowerCase());
+          if (similarity >= similarityThreshold) {
+            debugPrint('[ForYou] Similar: ${l.title} (tag: $tag) ~ $interactedTag (sim: $similarity)');
+            return true;
+          }
+        }
+      }
+      return false;
+    }).toList();
+
+    // 4. Combinar interactuados y similares, sin duplicados
+    final allForYou = [...interactedListings, ...similarListings];
+
+    // LOG: Mostrar cuántos ítems se recomiendan
+    debugPrint('[ForYou] Total recommendations: ${allForYou.length}');
+
+    return allForYou;
+  }
 
   // 'For You' recomendaciones IA (asíncrono)
   Future<List<Listing>> getForYouAIRecommendations() async {

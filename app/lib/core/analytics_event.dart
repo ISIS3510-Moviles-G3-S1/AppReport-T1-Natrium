@@ -66,14 +66,31 @@ class AnalyticsEvent {
   /// Fired on every meaningful user interaction (buy, like, sell).
   static AnalyticsEvent userMeaningfulInteraction({
     required String userId,
-    required String interactionType, // "buy" | "like" | "sell"
+    required String interactionType, // "buy" | "like" | "sell" | "view"
     required String timestamp,       // ISO-8601
+    required String category,        // Category/tag of the item
   }) =>
       AnalyticsEvent(
         name: 'user_meaningful_interaction',
         parameters: {
           'user_id': AnalyticsValue.string(userId),
           'interaction_type': AnalyticsValue.string(interactionType),
+          'timestamp': AnalyticsValue.string(timestamp),
+          'category': AnalyticsValue.string(category),
+        },
+      );
+
+  /// Fired when a new item is uploaded (for category new item count).
+  static AnalyticsEvent newItemUploaded({
+    required String userId,         // Seller's user id
+    required String category,       // Category/tag of the item
+    required String timestamp,      // ISO-8601
+  }) =>
+      AnalyticsEvent(
+        name: 'new_item_uploaded',
+        parameters: {
+          'user_id': AnalyticsValue.string(userId),
+          'category': AnalyticsValue.string(category),
           'timestamp': AnalyticsValue.string(timestamp),
         },
       );
