@@ -68,10 +68,12 @@ class ScanQrViewModel extends ChangeNotifier {
       _hasHandledScan = true;
 
       AnalyticsService.instance.track(
+        // If you have access to the category/tag, use it. Otherwise, use 'Unknown'.
         AnalyticsEvent.userMeaningfulInteraction(
           userId: currentUserId,
           interactionType: 'buy',
           timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: 'Unknown',
         ),
       );
     } on FormatException {

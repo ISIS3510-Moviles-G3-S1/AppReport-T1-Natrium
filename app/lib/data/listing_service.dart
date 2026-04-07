@@ -4,6 +4,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/listing.dart';
+import '../core/analytics_event.dart';
+import '../core/analytics_service.dart';
 
 class ListingService {
     /// Returns the DateTime of the last post (listing) by this seller, or null if none.
@@ -115,6 +117,17 @@ class ListingService {
         'imagePath': imageUrls.isNotEmpty ? imageUrls[0] : '',
       });
     await docRef.set(data);
+
+    // Analytics: track new item uploaded
+    final category = (listing.tags.isNotEmpty ? listing.tags[0] : 'Other');
+    AnalyticsService.instance.track(
+      AnalyticsEvent.newItemUploaded(
+        userId: user.uid,
+        category: category,
+        timestamp: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+
     final doc = await docRef.get();
     return Listing.fromFirestore(doc);
   }
