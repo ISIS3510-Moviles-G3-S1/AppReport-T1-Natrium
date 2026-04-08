@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
-import '../core/photo_quality_analyzer.dart';
+import '../core/photo_quality_vision_service.dart';
 import 'package:flutter/material.dart';
 import '../core/analytics_event.dart';
 import '../core/analytics_service.dart';
@@ -10,8 +10,26 @@ import '../data/listing_service.dart';
 import '../models/listing.dart';
 import 'session_view_model.dart';
 
+
 class SellViewModel extends ChangeNotifier {
-  SellViewModel(this._session);
+  SellViewModel(this._session) {
+    _visionService = VisionPhotoQualityService(apiKey: _visionApiKey);
+  }
+
+
+  static const String _visionApiKey = String.fromEnvironment('GOOGLE_CLOUD_VISION_API_KEY');
+  late VisionPhotoQualityService _visionService;
+  /// Analyze the quality of a photo using Google Cloud Vision API
+  Future<VisionPhotoQualityResult?> analyzePhoto(XFile image) async {
+    try {
+      final result = await _visionService.analyzePhoto(image);
+      // You can add logic here to show warnings/suggestions to the user
+      return result;
+    } catch (e) {
+      debugPrint('[SellVM] Vision API analysis failed: $e');
+      return null;
+    }
+  }
 
   final ListingService _listingService = ListingService();
   SessionViewModel _session;

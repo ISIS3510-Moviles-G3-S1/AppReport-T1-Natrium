@@ -60,48 +60,7 @@ class PhotoQualityAnalyzer {
       score -= 0.3;
     }
 
-    // Resolution
-    print('[PhotoQualityAnalyzer] Resolution: ${image.width}x${image.height}');
-    if (image.width < minWidth || image.height < minHeight) {
-      issues.add('LOW_RESOLUTION');
-      suggestions.add('Use a higher resolution image.');
-      score -= 0.2;
-    }
-
-    // Clamp score
-    score = score.clamp(0.0, 1.0);
-
-    return PhotoQualityResult(
-      qualityScore: score,
-      issues: issues,
-      suggestions: suggestions,
-    );
-  }
-
-  static double _analyzeBrightness(img.Image image) {
-    int sum = 0;
-    for (int y = 0; y < image.height; y++) {
-      for (int x = 0; x < image.width; x++) {
-        final pixel = image.getPixel(x, y);
-        // Use only bitwise extraction for compatibility with image >=4.0.0
-        final r = (pixel >> 16) & 0xFF;
-        final g = (pixel >> 8) & 0xFF;
-        final b = pixel & 0xFF;
-        final gray = (0.299 * r + 0.587 * g + 0.114 * b).round();
-        sum += gray;
-      }
-    }
-    return sum / (image.width * image.height);
-  }
-
-  static double _analyzeBlur(img.Image image) {
-    // Laplacian variance (approximation)
-    final gray = img.grayscale(image);
-    final lap = img.convolution(gray, [
-      0,  1, 0,
-      1, -4, 1,
-      0,  1, 0,
-    ]);
+    // Archivo eliminado: PhotoQualityAnalyzer ya no se usa en la app.
     final pixels = lap.getBytes();
     final mean = pixels.reduce((a, b) => a + b) / pixels.length;
     final variance = pixels.map((p) => (p - mean) * (p - mean)).reduce((a, b) => a + b) / pixels.length;

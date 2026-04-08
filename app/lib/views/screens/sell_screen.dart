@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/app_theme.dart';
 import '../../views/screens/clothing_analysis_screen.dart';
 import '../../views/screens/photo_analysis_screen.dart';
-import '../../core/photo_quality_analyzer.dart';
+// import eliminado: '../../core/photo_quality_analyzer.dart';
 import '../../core/photo_quality_vision_service.dart';
 import '../../view_models/sell_view_model.dart';
 
