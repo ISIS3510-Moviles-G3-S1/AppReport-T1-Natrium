@@ -143,7 +143,7 @@ class AnalyticsEvent {
       );
 
   // ---------------------------------------------------------------------------
-  // Type-3 Business Question: Automatic theme switching by time-of-day
+  // Type-1 Business Question: Automatic theme switching by time-of-day
   // ---------------------------------------------------------------------------
 
   /// Fired when the app AUTOMATICALLY switches theme based on time-of-day context.
