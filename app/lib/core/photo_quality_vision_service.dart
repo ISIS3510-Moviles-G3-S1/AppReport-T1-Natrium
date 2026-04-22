@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
@@ -61,6 +63,21 @@ class VisionPhotoQualityService {
         error: 'API key missing',
       );
     }
+
+    final connectivity = Connectivity();
+    final connectivityResults = await connectivity.checkConnectivity();
+    final isOffline = connectivityResults.isEmpty ||
+        connectivityResults.contains(ConnectivityResult.none);
+    if (isOffline) {
+      return VisionPhotoQualityResult(
+        isBlurry: false,
+        isUnderexposed: false,
+        isOverexposed: false,
+        blurLikelihood: 0.0,
+        exposureLikelihood: 0.5,
+        error: 'No internet connection',
+      );
+    }
     final payload = {
       'requests': [
         {
@@ -72,20 +89,31 @@ class VisionPhotoQualityService {
         }
       ]
     };
-    final uri = Uri.parse('$_visionUrl?key=$_apiKey');
-    final response = await _httpClient.post(uri, body: jsonEncode(payload), headers: {'Content-Type': 'application/json'});
-    if (response.statusCode != 200) {
-      return VisionPhotoQualityResult(
-        isBlurry: false,
-        isUnderexposed: false,
-        isOverexposed: false,
-        blurLikelihood: 0.0,
-        exposureLikelihood: 0.0,
-        error: 'Vision API error: ${response.statusCode}',
-      );
-    }
-    final data = jsonDecode(response.body);
     try {
+      final uri = Uri.parse('$_visionUrl?key=$_apiKey');
+      final response = await _httpClient
+          .post(
+            uri,
+            body: jsonEncode(payload),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(
+            const Duration(seconds: 12),
+            onTimeout: () => throw TimeoutException('Photo quality analysis timed out'),
+          );
+
+      if (response.statusCode != 200) {
+        return VisionPhotoQualityResult(
+          isBlurry: false,
+          isUnderexposed: false,
+          isOverexposed: false,
+          blurLikelihood: 0.0,
+          exposureLikelihood: 0.0,
+          error: 'Vision API error: ${response.statusCode}',
+        );
+      }
+
+      final data = jsonDecode(response.body);
       final resp = data['responses'][0];
       // Check for blur using LABEL_DETECTION (improved sensitivity)
       final labels = resp['labelAnnotations'] as List<dynamic>? ?? [];
@@ -133,14 +161,23 @@ class VisionPhotoQualityService {
         exposureLikelihood: exposureLikelihood,
         error: null,
       );
+    } on TimeoutException {
+      return VisionPhotoQualityResult(
+        isBlurry: false,
+        isUnderexposed: false,
+        isOverexposed: false,
+        blurLikelihood: 0.0,
+        exposureLikelihood: 0.5,
+        error: 'Analysis timeout',
+      );
     } catch (e) {
       return VisionPhotoQualityResult(
         isBlurry: false,
         isUnderexposed: false,
         isOverexposed: false,
         blurLikelihood: 0.0,
-        exposureLikelihood: 0.0,
-        error: 'Parsing error: $e',
+        exposureLikelihood: 0.5,
+        error: 'Analysis unavailable: $e',
       );
     }
   }

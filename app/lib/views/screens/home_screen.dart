@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           textStyle: const TextStyle(fontSize: 16),
                         ),
-                        child: const Text('Ver artículos'),
+                        child: const Text('See New Items'),
                       ),
                     ),
                   ],

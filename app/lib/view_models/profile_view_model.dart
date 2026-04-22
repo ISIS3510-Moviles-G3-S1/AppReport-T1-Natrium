@@ -125,7 +125,7 @@ class ProfileViewModel extends ChangeNotifier {
     return progress * 100;
   }
 
-  Future<void> deleteListing(String id) async {
+  Future<bool> deleteListing(String id) async {
     final listing = _listings.firstWhere((l) => l.id == id, orElse: () => const Listing(
       id: '',
       sellerId: '',
@@ -135,8 +135,8 @@ class ProfileViewModel extends ChangeNotifier {
       description: '',
       sellerName: '',
     ));
-    if (listing.id.isEmpty) return;
-    await _listingService.deleteListing(listing);
+    if (listing.id.isEmpty) return false;
+    return _listingService.deleteListing(listing);
   }
 
   void _startListingsListener() {

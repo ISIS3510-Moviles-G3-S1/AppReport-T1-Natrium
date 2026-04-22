@@ -50,13 +50,29 @@ class _PhotoAnalysisScreenState extends State<PhotoAnalysisScreen> {
     setState(() {
       loading = true;
     });
-    // Run vision analysis
-    final visionService = VisionPhotoQualityService();
-    final result = await visionService.analyzePhoto(widget.photo);
-    setState(() {
-      visionResult = result;
-    });
-    await _analyzeFraming();
+    try {
+      // Run vision analysis
+      final visionService = VisionPhotoQualityService();
+      final result = await visionService.analyzePhoto(widget.photo);
+      if (!mounted) return;
+      setState(() {
+        visionResult = result;
+      });
+      await _analyzeFraming();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        visionResult = VisionPhotoQualityResult(
+          isBlurry: false,
+          isUnderexposed: false,
+          isOverexposed: false,
+          blurLikelihood: 0.0,
+          exposureLikelihood: 0.5,
+          error: 'Unable to analyze right now.',
+        );
+        loading = false;
+      });
+    }
   }
 
   Future<void> _analyzeFraming() async {

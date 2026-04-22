@@ -15,6 +15,27 @@ import '../../models/profile_models.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete clothing listing?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -573,11 +594,20 @@ class ProfileScreen extends StatelessWidget {
                                                       ),
                                                       const SizedBox(width: 8),
                                                       IconButton(
-                                                        onPressed:
-                                                            () => vm
-                                                                .deleteListing(
-                                                                  listing.id,
-                                                                ),
+                                                        onPressed: () async {
+                                                          final confirmed = await _confirmDelete(context);
+                                                          if (!confirmed || !context.mounted) return;
+
+                                                          final queuedOffline = await vm.deleteListing(listing.id);
+                                                          if (!context.mounted) return;
+
+                                                          final message = queuedOffline
+                                                              ? 'Your clothing will be deleted when internet connection is restored.'
+                                                              : 'Clothing deleted successfully.';
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            SnackBar(content: Text(message)),
+                                                          );
+                                                        },
                                                         icon: const Icon(
                                                           Icons
                                                               .delete_outline_rounded,

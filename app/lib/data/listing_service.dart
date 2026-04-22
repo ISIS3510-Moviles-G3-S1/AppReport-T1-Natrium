@@ -1,28 +1,64 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/listing.dart';
 import '../core/analytics_event.dart';
 import '../core/analytics_service.dart';
+import '../core/image_analysis_service.dart';
 
 class ListingService {
-    /// Returns the DateTime of the last post (listing) by this seller, or null if none.
-    Future<DateTime?> getLastPostDate(String sellerId) async {
-      final query = await _db
-          .collection(_collection)
-          .where('sellerId', isEqualTo: sellerId)
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .get();
-      if (query.docs.isEmpty) return null;
-      final listing = Listing.fromFirestore(query.docs.first);
-      return listing.createdAt;
-    }
+  ListingService() {
+    _syncDriver = this;
+    _initializeOnce();
+  }
+
   final _db = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
   final _collection = 'listings';
+  final ImageAnalysisService _imageAnalysisService = CloudVisionImageAnalysisService();
+
+  static const String _pendingOpsStorageKey = 'listing_pending_operations_v1';
+  static const String _typeCreate = 'pending_create';
+  static const String _typeUpdate = 'pending_update';
+  static const String _typeDelete = 'pending_delete';
+
+  static bool _initialized = false;
+  static bool _syncInProgress = false;
+  static StreamSubscription<dynamic>? _connectivitySub;
+  static ListingService? _syncDriver;
+
+  void _initializeOnce() {
+    if (_initialized) return;
+    _initialized = true;
+
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((event) {
+      if (_hasConnectivity(event)) {
+        unawaited(_syncDriver?._syncPendingOperations());
+      }
+    });
+
+    unawaited(_syncPendingOperations());
+  }
+
+  /// Returns the DateTime of the last post (listing) by this seller, or null if none.
+  Future<DateTime?> getLastPostDate(String sellerId) async {
+    final query = await _db
+        .collection(_collection)
+        .where('sellerId', isEqualTo: sellerId)
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
+    if (query.docs.isEmpty) return null;
+    final listing = Listing.fromFirestore(query.docs.first);
+    return listing.createdAt;
+  }
 
   Stream<List<Listing>> getListings() {
     return _db
@@ -69,6 +105,14 @@ class ListingService {
     return Listing.fromFirestore(doc);
   }
 
+  Future<void> syncPendingOperations() async {
+    await _syncPendingOperations();
+  }
+
+  Future<bool> isOnlineNow() async {
+    return _isOnline();
+  }
+
   Future<String> _uploadImage(XFile image, String listingId, int index) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User not authenticated');
@@ -102,6 +146,65 @@ class ListingService {
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User not authenticated');
+
+    final shouldQueuePendingTags = listing.tags.isEmpty && images.isNotEmpty;
+    final isOnline = await _isOnline();
+
+    if (!isOnline) {
+      final localId = _localListingId();
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeCreate,
+        'listingId': localId,
+        'sellerId': user.uid,
+        'listing': _serializeListingForQueue(listing, sellerId: user.uid),
+        'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
+        'pendingTags': shouldQueuePendingTags,
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      return _cloneListingWith(
+        listing,
+        id: localId,
+        sellerId: user.uid,
+        createdAt: DateTime.now(),
+      );
+    }
+
+    try {
+      return await _createListingOnline(
+        listing: listing,
+        images: images,
+        sellerId: user.uid,
+      );
+    } catch (e) {
+      debugPrint('[ListingService] createListing online failed, queueing offline: $e');
+      final localId = _localListingId();
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeCreate,
+        'listingId': localId,
+        'sellerId': user.uid,
+        'listing': _serializeListingForQueue(listing, sellerId: user.uid),
+        'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
+        'pendingTags': shouldQueuePendingTags,
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      return _cloneListingWith(
+        listing,
+        id: localId,
+        sellerId: user.uid,
+        createdAt: DateTime.now(),
+      );
+    }
+  }
+
+  Future<Listing> _createListingOnline({
+    required Listing listing,
+    required List<XFile> images,
+    required String sellerId,
+  }) async {
     final docRef = _db.collection(_collection).doc();
     final listingId = docRef.id;
     List<String> imageUrls = [];
@@ -111,7 +214,7 @@ class ListingService {
     }
     final data = listing.toFirestore()
       ..addAll({
-        'sellerId': user.uid,
+        'sellerId': sellerId,
         'createdAt': FieldValue.serverTimestamp(),
         'imageURLs': imageUrls,
         'imagePath': imageUrls.isNotEmpty ? imageUrls[0] : '',
@@ -122,7 +225,7 @@ class ListingService {
     final category = (listing.tags.isNotEmpty ? listing.tags[0] : 'Other');
     AnalyticsService.instance.track(
       AnalyticsEvent.newItemUploaded(
-        userId: user.uid,
+        userId: sellerId,
         category: category,
         timestamp: DateTime.now().toUtc().toIso8601String(),
       ),
@@ -133,19 +236,412 @@ class ListingService {
   }
 
   Future<void> updateListing(Listing listing) async {
-    await _db.collection(_collection).doc(listing.id).update(listing.toFirestore());
+    final isOnline = await _isOnline();
+    if (!isOnline) {
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeUpdate,
+        'listingId': listing.id,
+        'sellerId': listing.sellerId,
+        'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      return;
+    }
+
+    try {
+      await _db.collection(_collection).doc(listing.id).update(listing.toFirestore());
+    } catch (e) {
+      debugPrint('[ListingService] updateListing online failed, queueing offline: $e');
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeUpdate,
+        'listingId': listing.id,
+        'sellerId': listing.sellerId,
+        'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    }
   }
 
-  Future<void> deleteListing(Listing listing) async {
-    for (final url in listing.imageURLs) {
+  Future<bool> deleteListing(Listing listing) async {
+    final isOnline = await _isOnline();
+    if (!isOnline) {
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeDelete,
+        'listingId': listing.id,
+        'sellerId': listing.sellerId,
+        'imageURLs': listing.imageURLs,
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      return true;
+    }
+
+    try {
+      await _deleteListingOnline(listing.id, listing.imageURLs);
+      return false;
+    } catch (e) {
+      debugPrint('[ListingService] deleteListing online failed, queueing offline: $e');
+      await _enqueueOperation({
+        'opId': _operationId(),
+        'type': _typeDelete,
+        'listingId': listing.id,
+        'sellerId': listing.sellerId,
+        'imageURLs': listing.imageURLs,
+        'queuedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      return true;
+    }
+  }
+
+  Future<void> _deleteListingOnline(String listingId, List<String> imageUrls) async {
+    for (final url in imageUrls) {
       if (url.isNotEmpty) {
         try {
           await _storage.refFromURL(url).delete();
         } catch (_) {}
       }
     }
-    await _db.collection(_collection).doc(listing.id).delete();
+    await _db.collection(_collection).doc(listingId).delete();
   }
+
+  Future<bool> _isOnline() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      return _hasConnectivity(result);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static bool _hasConnectivity(dynamic result) {
+    if (result is ConnectivityResult) {
+      return result != ConnectivityResult.none;
+    }
+    if (result is List<ConnectivityResult>) {
+      return result.any((e) => e != ConnectivityResult.none);
+    }
+    return true;
+  }
+
+  Future<void> _syncPendingOperations() async {
+    if (_syncInProgress) return;
+    _syncInProgress = true;
+
+    try {
+      if (!await _isOnline()) return;
+
+      final queue = await _loadQueue();
+      if (queue.isEmpty) return;
+
+      final idMap = <String, String>{};
+      final remaining = <Map<String, dynamic>>[];
+
+      for (final op in queue) {
+        final type = op['type']?.toString() ?? '';
+        final originalListingId = op['listingId']?.toString() ?? '';
+        final resolvedListingId = idMap[originalListingId] ?? originalListingId;
+
+        try {
+          if (type == _typeCreate) {
+            final createdId = await _applyCreateOperation(op);
+            if (createdId != null && originalListingId != createdId) {
+              idMap[originalListingId] = createdId;
+            }
+            continue;
+          }
+
+          if (type == _typeUpdate) {
+            await _applyUpdateOperation(op, listingIdOverride: resolvedListingId);
+            continue;
+          }
+
+          if (type == _typeDelete) {
+            await _applyDeleteOperation(op, listingIdOverride: resolvedListingId);
+            continue;
+          }
+
+          remaining.add(op);
+        } catch (e) {
+          debugPrint('[ListingService] sync op failed ($type): $e');
+          remaining.add(op);
+        }
+      }
+
+      await _saveQueue(remaining);
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<String?> _applyCreateOperation(Map<String, dynamic> op) async {
+    final listingRaw = op['listing'];
+    if (listingRaw is! Map) return null;
+
+    final listingMap = Map<String, dynamic>.from(listingRaw);
+    final sellerId = op['sellerId']?.toString() ?? listingMap['sellerId']?.toString() ?? '';
+    final shouldGeneratePendingTags = op['pendingTags'] == true;
+
+    final imagePaths = (op['imagePaths'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList() ??
+        const <String>[];
+
+    final existingRemoteListingId = op['remoteListingId']?.toString() ?? '';
+    final remoteListingId = existingRemoteListingId.isNotEmpty
+        ? existingRemoteListingId
+        : _db.collection(_collection).doc().id;
+
+    if (existingRemoteListingId.isEmpty) {
+      final imageUrls = <String>[];
+      for (int i = 0; i < imagePaths.length && i < 5; i++) {
+        final path = imagePaths[i];
+        if (path.trim().isEmpty) continue;
+        final url = await _uploadImage(XFile(path), remoteListingId, i);
+        imageUrls.add(url);
+      }
+
+      final firestoreData = _queuedListingToFirestoreData(listingMap)
+        ..addAll({
+          'sellerId': sellerId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'imageURLs': imageUrls,
+          'imagePath': imageUrls.isNotEmpty ? imageUrls[0] : '',
+          'tagsPending': shouldGeneratePendingTags,
+        });
+
+      await _db.collection(_collection).doc(remoteListingId).set(firestoreData);
+      op['remoteListingId'] = remoteListingId;
+    }
+
+    if (shouldGeneratePendingTags) {
+      await _generateAndUpdateTags(
+        listingId: remoteListingId,
+        imagePaths: imagePaths,
+      );
+    }
+
+    return remoteListingId;
+  }
+
+  Future<void> _applyUpdateOperation(
+    Map<String, dynamic> op, {
+    required String listingIdOverride,
+  }) async {
+    if (listingIdOverride.trim().isEmpty || listingIdOverride.startsWith('local_')) {
+      throw StateError('Update is waiting for local create sync.');
+    }
+
+    final listingRaw = op['listing'];
+    if (listingRaw is! Map) return;
+
+    final firestoreData = _queuedListingToFirestoreData(Map<String, dynamic>.from(listingRaw));
+    await _db.collection(_collection).doc(listingIdOverride).update(firestoreData);
+  }
+
+  Future<void> _applyDeleteOperation(
+    Map<String, dynamic> op, {
+    required String listingIdOverride,
+  }) async {
+    if (listingIdOverride.trim().isEmpty) return;
+
+    final imageUrls = (op['imageURLs'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.trim().isNotEmpty)
+            .toList() ??
+        const <String>[];
+
+    if (listingIdOverride.startsWith('local_')) {
+      throw StateError('Delete is waiting for local create sync.');
+    }
+
+    await _deleteListingOnline(listingIdOverride, imageUrls);
+  }
+
+  Future<void> _generateAndUpdateTags({
+    required String listingId,
+    required List<String> imagePaths,
+  }) async {
+    if (imagePaths.isEmpty) return;
+
+    final firstPath = imagePaths.first;
+    if (firstPath.trim().isEmpty) return;
+
+    try {
+      final analysis = await _imageAnalysisService.analyzeImage(XFile(firstPath));
+      final generatedTags = _flattenTagMap(analysis.toListingTagsMap());
+      if (generatedTags.isEmpty) return;
+
+      await _db.collection(_collection).doc(listingId).update({
+        'tags': generatedTags,
+        'tagsPending': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('[ListingService] pending AI tag generation failed for $listingId: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _enqueueOperation(Map<String, dynamic> operation) async {
+    final queue = await _loadQueue();
+    final type = operation['type']?.toString() ?? '';
+    final listingId = operation['listingId']?.toString() ?? '';
+
+    if (type == _typeCreate) {
+      queue.removeWhere(
+        (op) =>
+            (op['type']?.toString() == _typeCreate || op['type']?.toString() == _typeUpdate) &&
+            op['listingId']?.toString() == listingId,
+      );
+      queue.add(operation);
+      await _saveQueue(queue);
+      return;
+    }
+
+    if (type == _typeUpdate) {
+      final createIndex = queue.indexWhere(
+        (op) => op['type']?.toString() == _typeCreate && op['listingId']?.toString() == listingId,
+      );
+
+      if (createIndex >= 0) {
+        final existingCreate = queue[createIndex];
+        existingCreate['listing'] = operation['listing'];
+        queue[createIndex] = existingCreate;
+      } else {
+        queue.removeWhere(
+          (op) => op['type']?.toString() == _typeUpdate && op['listingId']?.toString() == listingId,
+        );
+        queue.add(operation);
+      }
+
+      await _saveQueue(queue);
+      return;
+    }
+
+    if (type == _typeDelete) {
+      final hasLocalCreate = queue.any(
+        (op) => op['type']?.toString() == _typeCreate && op['listingId']?.toString() == listingId,
+      );
+
+      if (hasLocalCreate) {
+        queue.removeWhere(
+          (op) =>
+              (op['type']?.toString() == _typeCreate || op['type']?.toString() == _typeUpdate) &&
+              op['listingId']?.toString() == listingId,
+        );
+      } else {
+        queue.removeWhere(
+          (op) =>
+              (op['type']?.toString() == _typeUpdate || op['type']?.toString() == _typeDelete) &&
+              op['listingId']?.toString() == listingId,
+        );
+        queue.add(operation);
+      }
+
+      await _saveQueue(queue);
+      return;
+    }
+
+    queue.add(operation);
+    await _saveQueue(queue);
+  }
+
+  Future<List<Map<String, dynamic>>> _loadQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_pendingOpsStorageKey);
+    if (raw == null || raw.trim().isEmpty) return [];
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _saveQueue(List<Map<String, dynamic>> queue) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingOpsStorageKey, jsonEncode(queue));
+  }
+
+  Map<String, dynamic> _serializeListingForQueue(
+    Listing listing, {
+    required String sellerId,
+  }) {
+    final map = Map<String, dynamic>.from(listing.toFirestore());
+    map['sellerId'] = sellerId;
+    map['createdAt'] = listing.createdAt?.toIso8601String();
+    map['soldAt'] = listing.soldAt?.toIso8601String();
+    return map;
+  }
+
+  Map<String, dynamic> _queuedListingToFirestoreData(Map<String, dynamic> raw) {
+    final map = Map<String, dynamic>.from(raw);
+
+    final createdAtRaw = map['createdAt'];
+    if (createdAtRaw is String && createdAtRaw.trim().isNotEmpty) {
+      map['createdAt'] = DateTime.tryParse(createdAtRaw);
+    }
+
+    final soldAtRaw = map['soldAt'];
+    if (soldAtRaw is String && soldAtRaw.trim().isNotEmpty) {
+      map['soldAt'] = DateTime.tryParse(soldAtRaw);
+    }
+
+    return map;
+  }
+
+  List<String> _flattenTagMap(Map<String, List<String>> tagMap) {
+    final output = <String>[];
+    for (final key in const ['category', 'color', 'style', 'pattern']) {
+      output.addAll(tagMap[key] ?? const []);
+    }
+
+    final deduped = <String>[];
+    for (final tag in output) {
+      final value = tag.trim();
+      if (value.isEmpty) continue;
+      if (!deduped.contains(value)) {
+        deduped.add(value);
+      }
+    }
+    return deduped;
+  }
+
+  Listing _cloneListingWith(
+    Listing listing, {
+    required String id,
+    required String sellerId,
+    required DateTime createdAt,
+  }) {
+    return Listing(
+      id: id,
+      sellerId: sellerId,
+      title: listing.title,
+      price: listing.price,
+      conditionTag: listing.conditionTag,
+      description: listing.description,
+      sellerName: listing.sellerName,
+      exchangeType: listing.exchangeType,
+      tags: listing.tags,
+      rating: listing.rating,
+      imageName: listing.imageName,
+      createdAt: createdAt,
+      soldAt: listing.soldAt,
+      imagePath: listing.imagePath,
+      imageURLs: listing.imageURLs,
+      status: listing.status,
+      saved: listing.saved,
+    );
+  }
+
+  String _operationId() => 'op_${DateTime.now().microsecondsSinceEpoch}';
+
+  String _localListingId() => 'local_${DateTime.now().microsecondsSinceEpoch}';
 
   String _normalizeExtension(String fileName) {
     final lower = fileName.toLowerCase();

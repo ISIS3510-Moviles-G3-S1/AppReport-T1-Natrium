@@ -188,14 +188,102 @@ class _Gallery extends StatelessWidget {
   }
 }
 
-class _InfoSection extends StatelessWidget {
+class _InfoSection extends StatefulWidget {
   final ItemDetail item;
   final ItemDetailViewModel vm;
 
   const _InfoSection({required this.item, required this.vm});
 
   @override
+  State<_InfoSection> createState() => _InfoSectionState();
+}
+
+class _InfoSectionState extends State<_InfoSection> {
+  static const List<String> _conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
+  static const List<String> _exchangeTypes = ['sell', 'swap', 'donate'];
+
+  late final TextEditingController _titleController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _tagsController;
+
+  bool _isEditMode = false;
+  String _condition = 'Good';
+  String _exchangeType = 'sell';
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController();
+    _priceController = TextEditingController();
+    _descriptionController = TextEditingController();
+    _tagsController = TextEditingController();
+    _syncFromItem();
+  }
+
+  @override
+  void didUpdateWidget(covariant _InfoSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.id != widget.item.id || oldWidget.item != widget.item) {
+      _syncFromItem();
+    }
+  }
+
+  void _syncFromItem() {
+    final item = widget.item;
+    _titleController.text = item.name;
+    _priceController.text = item.price.toInt().toString();
+    _descriptionController.text = item.description;
+    _tagsController.text = item.tags.join(', ');
+    _condition = item.condition;
+    _exchangeType = item.exchangeType;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveEdits() async {
+    final tags = _tagsController.text
+        .split(',')
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+
+    try {
+      await widget.vm.updateListingDetails(
+        title: _titleController.text,
+        priceText: _priceController.text,
+        condition: _condition,
+        exchangeType: _exchangeType,
+        description: _descriptionController.text,
+        tags: tags,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isEditMode = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing updated successfully.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Invalid argument(s): ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final vm = widget.vm;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
     final bodyTextColor = isDark ? colorScheme.onSurface : AppTheme.foreground;
@@ -231,71 +319,177 @@ class _InfoSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.name,
-                style:
-                    Theme.of(context).textTheme.titleLarge ??
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-            ),
-            IconButton(
-              onPressed: () => vm.toggleSaved(context),
-              icon: Icon(
-                vm.saved ? Icons.favorite : Icons.favorite_border_outlined,
-                color: vm.saved ? Colors.red : secondaryTextColor,
-                size: 22,
-              ),
-            ),
-            IconButton(
-              onPressed: () {},
-              icon: Icon(
-                Icons.ios_share_outlined,
-                color: secondaryTextColor,
-                size: 22,
-              ),
-            ),
-          ],
-        ),
-        Text(
-          PriceFormatter.formatCopFromNum(item.price),
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.sage,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            Chip(
-              label: Text(
-                item.condition,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: chipTextColor,
+        if (_isEditMode)
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
                 ),
               ),
-              backgroundColor: AppTheme.cardBg,
-              side: BorderSide(color: borderColor),
-              shape: const StadiumBorder(),
-            ),
-            Chip(
-              label: Text(
-                exchangeLabel,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              if (isSeller)
+                IconButton(
+                  onPressed: vm.isUpdating
+                      ? null
+                      : () {
+                          setState(() {
+                            _syncFromItem();
+                            _isEditMode = false;
+                          });
+                        },
+                  icon: const Icon(Icons.close_rounded),
+                ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.name,
+                  style:
+                      Theme.of(context).textTheme.titleLarge ??
+                      const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
               ),
-              backgroundColor: AppTheme.sage.withValues(alpha: 0.35),
-              side: BorderSide(color: AppTheme.sage.withValues(alpha: 0.6)),
-              labelStyle: TextStyle(color: bodyTextColor, fontSize: 12),
-              shape: const StadiumBorder(),
+              if (isSeller)
+                IconButton(
+                  onPressed: vm.isUpdating
+                      ? null
+                      : () {
+                          setState(() {
+                            _isEditMode = true;
+                          });
+                        },
+                  icon: const Icon(Icons.edit_rounded),
+                ),
+              IconButton(
+                onPressed: () => vm.toggleSaved(context),
+                icon: Icon(
+                  vm.saved ? Icons.favorite : Icons.favorite_border_outlined,
+                  color: vm.saved ? Colors.red : secondaryTextColor,
+                  size: 22,
+                ),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: Icon(
+                  Icons.ios_share_outlined,
+                  color: secondaryTextColor,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 8),
+        if (_isEditMode)
+          TextField(
+            controller: _priceController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Price (COP)'),
+          )
+        else
+          Text(
+            PriceFormatter.formatCopFromNum(item.price),
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.sage,
             ),
-          ],
-        ),
+          ),
+        const SizedBox(height: 8),
+        if (_isEditMode)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(
+                'Condition',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _conditions
+                    .map(
+                      (condition) => ChoiceChip(
+                        label: Text(condition),
+                        selected: _condition == condition,
+                        onSelected: (selected) {
+                          if (!selected) return;
+                          setState(() {
+                            _condition = condition;
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Exchange Type',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: secondaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _exchangeTypes
+                    .map(
+                      (type) => ChoiceChip(
+                        label: Text(_exchangeLabelFor(type)),
+                        selected: _exchangeType == type,
+                        onSelected: (selected) {
+                          if (!selected) return;
+                          setState(() {
+                            _exchangeType = type;
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(
+                label: Text(
+                  item.condition,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: chipTextColor,
+                  ),
+                ),
+                backgroundColor: AppTheme.cardBg,
+                side: BorderSide(color: borderColor),
+                shape: const StadiumBorder(),
+              ),
+              Chip(
+                label: Text(
+                  exchangeLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                backgroundColor: AppTheme.sage.withValues(alpha: 0.35),
+                side: BorderSide(color: AppTheme.sage.withValues(alpha: 0.6)),
+                labelStyle: TextStyle(color: bodyTextColor, fontSize: 12),
+                shape: const StadiumBorder(),
+              ),
+            ],
+          ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -313,28 +507,36 @@ class _InfoSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            ...item.tags
-                .take(3)
-                .map(
-                  (t) => Chip(
-                    label: Text(
-                      t,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: chipTextColor,
+        if (_isEditMode)
+          TextField(
+            controller: _tagsController,
+            decoration: const InputDecoration(
+              labelText: 'Tags (comma separated)',
+            ),
+          )
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ...item.tags
+                  .take(3)
+                  .map(
+                    (t) => Chip(
+                      label: Text(
+                        t,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: chipTextColor,
+                        ),
                       ),
+                      backgroundColor: AppTheme.cardBg,
+                      side: BorderSide(color: borderColor),
+                      shape: const StadiumBorder(),
                     ),
-                    backgroundColor: AppTheme.cardBg,
-                    side: BorderSide(color: borderColor),
-                    shape: const StadiumBorder(),
                   ),
-                ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
@@ -409,11 +611,51 @@ class _InfoSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          item.description,
-          style: TextStyle(fontSize: 14, height: 1.5, color: bodyTextColor),
-        ),
+        if (_isEditMode)
+          TextField(
+            controller: _descriptionController,
+            maxLines: 4,
+            decoration: const InputDecoration(labelText: 'Description'),
+          )
+        else
+          Text(
+            item.description,
+            style: TextStyle(fontSize: 14, height: 1.5, color: bodyTextColor),
+          ),
         const SizedBox(height: 16),
+        if (_isEditMode && isSeller) ...[
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: vm.isUpdating
+                      ? null
+                      : () {
+                          setState(() {
+                            _syncFromItem();
+                            _isEditMode = false;
+                          });
+                        },
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: vm.isUpdating ? null : _saveEdits,
+                  child: vm.isUpdating
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save Changes'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         _SellerCard(seller: item.seller),
         const SizedBox(height: 16),
         Row(

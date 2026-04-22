@@ -13,6 +13,10 @@ import 'session_view_model.dart';
 class SellViewModel extends ChangeNotifier {
   SellViewModel(this._session);
 
+  static const int titleMaxLength = 80;
+  static const int descriptionMinLength = 10;
+  static const int descriptionMaxLength = 300;
+
   final ListingService _listingService = ListingService();
   SessionViewModel _session;
 
@@ -79,6 +83,60 @@ class SellViewModel extends ChangeNotifier {
 
   List<XFile> get images => _images;
 
+  bool get _hasNegativePriceSign => _price.contains('-');
+
+  int get parsedPrice {
+    if (_hasNegativePriceSign) return 0;
+    return int.tryParse(_price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  }
+
+  String? get titleError {
+    final value = _title.trim();
+    if (value.isEmpty) return 'Title is required.';
+    if (value.length > titleMaxLength) {
+      return 'Title must be at most $titleMaxLength characters.';
+    }
+    return null;
+  }
+
+  String? get priceError {
+    final raw = _price.trim();
+    if (raw.isEmpty) return 'Price is required.';
+    if (_hasNegativePriceSign) return 'Price cannot be negative.';
+    if (parsedPrice <= 0) return 'Price must be greater than 0.';
+    return null;
+  }
+
+  String? get tagsError {
+    return null;
+  }
+
+  String? get descriptionError {
+    final value = _description.trim();
+    if (value.isEmpty) return 'Description is required.';
+    if (value.length < descriptionMinLength) {
+      return 'Description must be at least $descriptionMinLength characters.';
+    }
+    if (value.length > descriptionMaxLength) {
+      return 'Description must be at most $descriptionMaxLength characters.';
+    }
+    if (RegExp(r'^\d+$').hasMatch(value)) {
+      return 'Description cannot contain only numbers.';
+    }
+    return null;
+  }
+
+  String? get imageError {
+    if (_images.isEmpty) return 'Add at least one photo.';
+    return null;
+  }
+
+  String? get firstPublishValidationError {
+    return imageError ?? titleError ?? priceError ?? descriptionError;
+  }
+
+  bool get canPublish => firstPublishValidationError == null;
+
   List<String> _parseTags(String value) {
     return value.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
@@ -117,22 +175,33 @@ class SellViewModel extends ChangeNotifier {
   }
 
   Future<void> publish() async {
+    final validationError = firstPublishValidationError;
+    if (validationError != null) {
+      throw ArgumentError(validationError);
+    }
+
+    if (_tags.isEmpty) {
+      final online = await _listingService.isOnlineNow();
+      if (online) {
+        throw ArgumentError('Add at least one tag, or publish while offline to use automatic tag generation later.');
+      }
+    }
+
     final user = _session.currentUser;
     final sellerName = user == null
         ? 'Me'
         : (user.displayName.trim().isNotEmpty
             ? user.displayName
             : user.email.split('@').first);
-    final parsedPrice = int.tryParse(_price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
     // Soporte para múltiples imágenes
     final listing = Listing(
       id: '', // Se asignará por Firestore
       sellerId: '', // Se asignará en ListingService
-      title: _title,
+      title: _title.trim(),
       price: parsedPrice,
       conditionTag: _condition,
-      description: _description,
+      description: _description.trim(),
       sellerName: sellerName,
       exchangeType: _exchangeType,
       tags: _tags,
