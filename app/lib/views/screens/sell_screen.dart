@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
@@ -393,14 +394,32 @@ class _PhotoUpload extends StatelessWidget {
 
   const _PhotoUpload({required this.vm});
 
+  void _showPickerError(BuildContext context, PlatformException error) {
+    if (!context.mounted) return;
+
+    final message =
+        'Could not load selected photo while offline (${error.code}). If the photo is in iCloud, open/download it in Photos first, or take a new photo.';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
 
 
   Future<XFile?> _pickImages(BuildContext context) async {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
     if (remaining <= 0) return null;
-    final pickedFiles = await picker.pickMultiImage(imageQuality: 85);
-    if (pickedFiles == null || pickedFiles.isEmpty) return null;
+    List<XFile> pickedFiles;
+    try {
+      pickedFiles = await picker.pickMultiImage(imageQuality: 85);
+    } on PlatformException catch (error) {
+      _showPickerError(context, error);
+      return null;
+    }
+
+    if (pickedFiles.isEmpty) return null;
     final filesToAdd = pickedFiles.take(remaining).toList();
     // If called for retake, return the first picked image
     if (ModalRoute.of(context)?.isCurrent != true) {
@@ -465,18 +484,26 @@ class _PhotoUpload extends StatelessWidget {
     final picker = ImagePicker();
     final remaining = 5 - vm.images.length;
     if (remaining <= 0) return null;
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    XFile? photo;
+    try {
+      photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+    } on PlatformException catch (error) {
+      _showPickerError(context, error);
+      return null;
+    }
+
     if (photo == null) return null;
+    final capturedPhoto = photo;
     // If called for retake, return the photo
     if (ModalRoute.of(context)?.isCurrent != true) {
-      return photo;
+      return capturedPhoto;
     }
     // Otherwise, add as usual
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PhotoAnalysisScreen(
-          photo: photo,
+          photo: capturedPhoto,
           sourceType: PhotoSourceType.camera,
           onRetake: (ctx) async {
             final retaken = await _takePhoto(ctx);
@@ -514,7 +541,7 @@ class _PhotoUpload extends StatelessWidget {
             }
           },
           onKeep: () {
-            vm.addImage(photo);
+            vm.addImage(capturedPhoto);
             Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/');
           },
         ),

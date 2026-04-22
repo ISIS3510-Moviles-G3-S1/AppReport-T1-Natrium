@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/analysis_error.dart';
@@ -42,15 +43,31 @@ class ClothingAnalysisViewModel extends ChangeNotifier {
   }
 
   Future<void> takePhoto() async {
-    final image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
-    if (image == null) return;
-    await analyze(image);
+    try {
+      final image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+      if (image == null) return;
+      await analyze(image);
+    } on PlatformException catch (error) {
+      _status = ClothingAnalysisStatus.error;
+      _error = AnalysisError.processingFailed(
+        'Image selection failed (${error.code}). If this photo is in iCloud, open it once in Photos or use camera while offline.',
+      );
+      notifyListeners();
+    }
   }
 
   Future<void> chooseFromGallery() async {
-    final image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
-    if (image == null) return;
-    await analyze(image);
+    try {
+      final image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+      if (image == null) return;
+      await analyze(image);
+    } on PlatformException catch (error) {
+      _status = ClothingAnalysisStatus.error;
+      _error = AnalysisError.processingFailed(
+        'Cannot load this gallery photo offline (${error.code}). Choose a local photo or take a new photo.',
+      );
+      notifyListeners();
+    }
   }
 
   Future<void> analyze(XFile image) async {

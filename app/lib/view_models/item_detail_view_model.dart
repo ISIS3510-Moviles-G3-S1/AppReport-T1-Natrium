@@ -15,12 +15,14 @@ class ItemDetailViewModel extends ChangeNotifier {
   int _activeImageIndex = 0;
   bool _saved = false;
   bool _messageSent = false;
+  bool _isUpdating = false;
 
   ItemDetail? get item => _item;
   int get activeImageIndex => _activeImageIndex;
   bool get saved => _saved;
   bool get messageSent => _messageSent;
   List<Map<String, dynamic>> get similarItems => _similarItems;
+  bool get isUpdating => _isUpdating;
 
   Future<void> loadItem(String id) async {
     final listing = await _listingService.getListingById(id);
@@ -92,6 +94,85 @@ class ItemDetailViewModel extends ChangeNotifier {
     );
     _messageSent = true;
     notifyListeners();
+  }
+
+  Future<void> updateListingDetails({
+    required String title,
+    required String priceText,
+    required String condition,
+    required String exchangeType,
+    required String description,
+    required List<String> tags,
+  }) async {
+    final current = _item;
+    if (current == null) {
+      throw ArgumentError('Listing not found.');
+    }
+
+    final normalizedTitle = title.trim();
+    final normalizedDescription = description.trim();
+    final price = int.tryParse(priceText.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (normalizedTitle.isEmpty) {
+      throw ArgumentError('Title is required.');
+    }
+    if (price <= 0) {
+      throw ArgumentError('Price must be greater than 0.');
+    }
+    if (normalizedDescription.isEmpty) {
+      throw ArgumentError('Description is required.');
+    }
+
+    final normalizedTags = tags
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+
+    final currentImages = List<String>.from(current.images);
+    final imagePath = currentImages.isNotEmpty ? currentImages.first : '';
+
+    _isUpdating = true;
+    notifyListeners();
+
+    try {
+      final listing = Listing(
+        id: current.id,
+        sellerId: current.sellerId,
+        title: normalizedTitle,
+        price: price,
+        conditionTag: condition,
+        description: normalizedDescription,
+        sellerName: current.seller.name,
+        exchangeType: exchangeType,
+        tags: normalizedTags,
+        rating: current.seller.rating,
+        imageName: '',
+        createdAt: null,
+        soldAt: null,
+        imagePath: imagePath,
+        imageURLs: currentImages,
+        status: 'active',
+        saved: _saved,
+      );
+
+      await _listingService.updateListing(listing);
+
+      _item = ItemDetail(
+        id: current.id,
+        sellerId: current.sellerId,
+        name: normalizedTitle,
+        price: price.toDouble(),
+        condition: condition,
+        exchangeType: exchangeType,
+        seller: current.seller,
+        aiScore: current.aiScore,
+        description: normalizedDescription,
+        images: currentImages,
+        tags: normalizedTags,
+      );
+    } finally {
+      _isUpdating = false;
+      notifyListeners();
+    }
   }
 
   List<Map<String, dynamic>> _buildSimilarItems({
