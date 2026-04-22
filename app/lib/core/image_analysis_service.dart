@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -56,6 +58,15 @@ class CloudVisionImageAnalysisService implements ImageAnalysisService {
       return _fallbackService.analyzeBytes(bytes, fileName: fileName);
     }
 
+    // Check internet connectivity - if offline, use fallback immediately
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    final isOffline = result.isEmpty || result.contains(ConnectivityResult.none);
+    if (isOffline) {
+      debugPrint('[CloudVision] No internet connection; using fallback analyzer. file=$fileName');
+      return _fallbackService.analyzeBytes(bytes, fileName: fileName);
+    }
+
     final stopwatch = Stopwatch()..start();
 
     try {
@@ -95,6 +106,9 @@ class CloudVisionImageAnalysisService implements ImageAnalysisService {
       uri,
       headers: const {'Content-Type': 'application/json; charset=utf-8'},
       body: jsonEncode(payload),
+    ).timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => throw TimeoutException('Cloud Vision API request timeout after 15 seconds'),
     );
 
     debugPrint('[CloudVision] response status=${response.statusCode} file=$fileName');
