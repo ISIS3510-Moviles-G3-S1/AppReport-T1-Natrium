@@ -28,6 +28,7 @@ class ListingService {
   static const String _typeCreate = 'pending_create';
   static const String _typeUpdate = 'pending_update';
   static const String _typeDelete = 'pending_delete';
+  static const int _maxAiTagImages = 3;
 
   static bool _initialized = false;
   static bool _syncInProgress = false;
@@ -466,12 +467,42 @@ class ListingService {
   }) async {
     if (imagePaths.isEmpty) return;
 
-    final firstPath = imagePaths.first;
-    if (firstPath.trim().isEmpty) return;
+    final pathsToAnalyze = imagePaths
+        .where((path) => path.trim().isNotEmpty)
+        .take(_maxAiTagImages)
+        .toList(growable: false);
+    if (pathsToAnalyze.isEmpty) return;
 
     try {
-      final analysis = await _imageAnalysisService.analyzeImage(XFile(firstPath));
-      final generatedTags = _flattenTagMap(analysis.toListingTagsMap());
+      final tagMapTasks = pathsToAnalyze
+          .map(
+            (path) => _imageAnalysisService
+                .analyzeImage(XFile(path))
+                .then((analysis) => analysis.toListingTagsMap())
+                .catchError((error, _) {
+                  debugPrint(
+                    '[ListingService] AI tag generation failed for image "$path": $error',
+                  );
+                  return <String, List<String>>{};
+                }),
+          )
+          .toList(growable: false);
+
+      final rawTagMaps = await Future.wait(tagMapTasks);
+      final serializableTagMaps = rawTagMaps
+          .map(
+            (tagMap) => tagMap.map(
+              (key, value) => MapEntry(key, List<String>.from(value)),
+            ),
+          )
+          .toList(growable: false);
+
+      // Merge and dedupe tags off the UI/main isolate to avoid jank.
+      final generatedTags = await compute(
+        _mergeAndFlattenTagMapsIsolate,
+        serializableTagMaps,
+      );
+
       if (generatedTags.isEmpty) return;
 
       await _db.collection(_collection).doc(listingId).update({
@@ -595,23 +626,6 @@ class ListingService {
     return map;
   }
 
-  List<String> _flattenTagMap(Map<String, List<String>> tagMap) {
-    final output = <String>[];
-    for (final key in const ['category', 'color', 'style', 'pattern']) {
-      output.addAll(tagMap[key] ?? const []);
-    }
-
-    final deduped = <String>[];
-    for (final tag in output) {
-      final value = tag.trim();
-      if (value.isEmpty) continue;
-      if (!deduped.contains(value)) {
-        deduped.add(value);
-      }
-    }
-    return deduped;
-  }
-
   Listing _cloneListingWith(
     Listing listing, {
     required String id,
@@ -665,4 +679,25 @@ class ListingService {
         return 'image/jpeg';
     }
   }
+}
+
+List<String> _mergeAndFlattenTagMapsIsolate(List<Map<String, List<String>>> tagMaps) {
+  final output = <String>[];
+
+  for (final tagMap in tagMaps) {
+    for (final key in const ['category', 'color', 'style', 'pattern']) {
+      output.addAll(tagMap[key] ?? const []);
+    }
+  }
+
+  final deduped = <String>[];
+  for (final tag in output) {
+    final value = tag.trim();
+    if (value.isEmpty) continue;
+    if (!deduped.contains(value)) {
+      deduped.add(value);
+    }
+  }
+
+  return deduped;
 }
