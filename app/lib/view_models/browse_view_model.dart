@@ -63,9 +63,13 @@ class BrowseViewModel extends ChangeNotifier {
     _loadSavedFromLocal();
   }
 
-  Future<void> _loadSavedFromLocal() async {
+  Future<void> reloadFavoritesForCurrentUser() async {
+    _savedItems.clear();
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (userId.isEmpty) return;
+    if (userId.isEmpty) {
+      notifyListeners();
+      return;
+    }
     final relations = await _favStorage.getRelationsByFavId(userId);
     for (final fypItemId in relations) {
       _savedItems[fypItemId] = true;
