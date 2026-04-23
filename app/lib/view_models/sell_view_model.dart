@@ -22,9 +22,11 @@ class SellViewModel extends ChangeNotifier {
   final ListingDraftStorage _draftStorage = ListingDraftStorage();
   SessionViewModel _session;
   bool _isRestoringDraft = false;
+  bool _draftRestored = false;
 
   void updateSession(SessionViewModel session) {
     _session = session;
+    _draftRestored = false;
     unawaited(_restoreDraft());
   }
 
@@ -93,6 +95,10 @@ class SellViewModel extends ChangeNotifier {
   }
 
   List<XFile> get images => _images;
+
+  bool get draftRestored => _draftRestored;
+
+  String? get currentUserId => _session.currentUser?.uid;
 
   bool get _hasNegativePriceSign => _price.contains('-');
 
@@ -275,6 +281,7 @@ class SellViewModel extends ChangeNotifier {
     if (draft == null) return;
 
     _isRestoringDraft = true;
+    _draftRestored = true;
     _title = (draft['title'] as String?) ?? '';
     _description = (draft['description'] as String?) ?? '';
     _price = (draft['price'] as String?) ?? '';
@@ -293,6 +300,25 @@ class SellViewModel extends ChangeNotifier {
             .toList() ??
         [];
     _isRestoringDraft = false;
+    notifyListeners();
+  }
+
+  void discardRestoredDraft() {
+    _draftRestored = false;
+    _title = '';
+    _description = '';
+    _price = '';
+    _condition = 'Good';
+    _exchangeType = 'sell';
+    _tags = [];
+    _tagsInput = '';
+    _images = [];
+    unawaited(_clearDraft());
+    notifyListeners();
+  }
+
+  void continueDraft() {
+    _draftRestored = false;
     notifyListeners();
   }
 

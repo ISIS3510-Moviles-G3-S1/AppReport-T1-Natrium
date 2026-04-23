@@ -96,6 +96,10 @@ class ProfileViewModel extends ChangeNotifier {
 
   int get soldCount => _listings.where((item) => item.isSold).length;
 
+  int get totalListingsCount => _listings.length;
+
+  String get soldCountDisplay => '$soldCount';
+
   EcoLevelInfo get ecoLevelInfo => _buildEcoLevelInfo(xp);
 
   int get xpToNext => ecoLevelInfo.xpToNext;

@@ -17,8 +17,62 @@ import '../../view_models/sell_view_model.dart';
 
 export 'clothing_analysis_screen.dart' show AnalysisResult_WithImage;
 
-class SellScreen extends StatelessWidget {
+class SellScreen extends StatefulWidget {
   const SellScreen({super.key});
+
+  @override
+  State<SellScreen> createState() => _SellScreenState();
+}
+
+class _SellScreenState extends State<SellScreen> {
+  bool _dialogShown = false;
+  String? _lastUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final vm = Provider.of<SellViewModel>(context, listen: false);
+    final currentUserId = vm.currentUserId;
+    
+    // Reset dialog flag when user changes
+    if (_lastUserId != currentUserId) {
+      _lastUserId = currentUserId;
+      _dialogShown = false;
+    }
+    
+    if (!_dialogShown && vm.draftRestored) {
+      _dialogShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showDraftRestorationDialog(context, vm);
+      });
+    }
+  }
+
+  void _showDraftRestorationDialog(BuildContext context, SellViewModel vm) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore saved item?'),
+        content: const Text('We found a draft you were working on. Would you like to continue with it or start fresh?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              vm.discardRestoredDraft();
+              Navigator.pop(context);
+            },
+            child: const Text('Discard'),
+          ),
+          FilledButton(
+            onPressed: () {
+              vm.continueDraft();
+              Navigator.pop(context);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

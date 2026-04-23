@@ -25,15 +25,19 @@ class SellerPerformanceViewModel extends ChangeNotifier {
   SellerPerformancePeriod _selectedPeriod = SellerPerformancePeriod.currentMonth;
   SellerPerformanceStatus _status = SellerPerformanceStatus.initial;
   int _soldCount = 0;
+  int _publishedCount = 0;
   String _feedbackMessage = '';
   String? _errorMessage;
   String? _loadedUserId;
   int _loadToken = 0;
   StreamSubscription<int>? _soldCountSubscription;
+  StreamSubscription<int>? _publishedCountSubscription;
 
   SellerPerformancePeriod get selectedPeriod => _selectedPeriod;
   SellerPerformanceStatus get status => _status;
   int get soldCount => _soldCount;
+  int get publishedCount => _publishedCount;
+  String get soldCountDisplay => '$soldCount/$publishedCount';
   String get feedbackMessage => _feedbackMessage;
   String? get errorMessage => _errorMessage;
   bool get isLoading => _status == SellerPerformanceStatus.loading;
@@ -63,12 +67,28 @@ class SellerPerformanceViewModel extends ChangeNotifier {
     final requestedPeriod = _selectedPeriod;
     final requestToken = ++_loadToken;
     await _soldCountSubscription?.cancel();
+    await _publishedCountSubscription?.cancel();
     _soldCountSubscription = null;
+    _publishedCountSubscription = null;
     _status = SellerPerformanceStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
+      // Subscribe to published listings count
+      _publishedCountSubscription = _service
+          .watchPublishedListingsForSeller(sellerId: requestedUserId)
+          .listen(
+            (count) {
+              if (_loadToken != requestToken || _session.currentUser?.uid != requestedUserId) {
+                return;
+              }
+              _publishedCount = count;
+              notifyListeners();
+            },
+          );
+
+      // Subscribe to sold listings count
       _soldCountSubscription = _service
           .watchSoldListingsForSeller(
             sellerId: requestedUserId,
@@ -82,7 +102,7 @@ class SellerPerformanceViewModel extends ChangeNotifier {
 
               _loadedUserId = requestedUserId;
               _soldCount = count;
-              _feedbackMessage = _buildFeedbackMessage(count, requestedPeriod);
+              _feedbackMessage = _buildFeedbackMessage(count, _publishedCount, requestedPeriod);
               _status = SellerPerformanceStatus.success;
               _errorMessage = null;
               notifyListeners();
@@ -120,14 +140,15 @@ class SellerPerformanceViewModel extends ChangeNotifier {
     Future.microtask(loadPerformance);
   }
 
-  String _buildFeedbackMessage(int count, SellerPerformancePeriod period) {
+  String _buildFeedbackMessage(int count, int published, SellerPerformancePeriod period) {
     final periodText = period.shortPhrase;
     if (count <= 0) {
       return 'No items sold $periodText yet. Try improving your photos or adjusting your price.';
     }
 
     final itemWord = count == 1 ? 'item' : 'items';
-    return 'Great job! You sold $count $itemWord $periodText.';
+    final ratio = '$count/$published';
+    return 'Great job! You sold $ratio $itemWord $periodText.';
   }
 
   void _handleSessionChanged() {
@@ -148,6 +169,7 @@ class SellerPerformanceViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _soldCountSubscription?.cancel();
+    _publishedCountSubscription?.cancel();
     _session.removeListener(_handleSessionChanged);
     super.dispose();
   }

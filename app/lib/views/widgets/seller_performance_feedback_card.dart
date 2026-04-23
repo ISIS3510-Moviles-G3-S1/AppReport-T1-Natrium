@@ -136,7 +136,7 @@ class SellerPerformanceFeedbackCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        vm.soldCount.toString(),
+                        vm.soldCountDisplay,
                         style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: isDark ? colorScheme.primary : AppTheme.deepGreen,

@@ -82,6 +82,16 @@ class SellerPerformanceService {
     }
   }
 
+  Stream<int> watchPublishedListingsForSeller({
+    required String sellerId,
+  }) {
+    return _db
+        .collection('listings')
+        .where('sellerId', isEqualTo: sellerId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
   Future<int> _countWithSimpleFallback({
     required String sellerId,
     required DateTime start,
