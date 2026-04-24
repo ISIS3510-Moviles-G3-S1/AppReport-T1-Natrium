@@ -8,12 +8,11 @@ import '../models/listing.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
 import '../data/fyp_fav_relation_storage.dart';
-
+import 'package:hive/hive.dart';
+import '../core/lru_cache_service.dart';
 
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
-
-
 
 class BrowseViewModel extends ChangeNotifier {
   final FypFavRelationStorage _favStorage = FypFavRelationStorage();
@@ -58,7 +57,37 @@ class BrowseViewModel extends ChangeNotifier {
 
   late RecommendationService _recommendationService;
 
-  BrowseViewModel() {
+  final LruCacheService<String, dynamic> _memoryCache;
+  final Box<dynamic> _localStorage;
+
+  BrowseViewModel(this._memoryCache, this._localStorage);
+
+  Future<void> cacheCatalogSnapshot(Map<String, dynamic> catalog) async {
+    _memoryCache.save('catalog', catalog);
+    await _localStorage.put('catalog_snapshot', catalog);
+  }
+
+  Map<String, dynamic>? getCachedCatalog() {
+    return _memoryCache.retrieve('catalog') ??
+        _localStorage.get('catalog_snapshot') as Map<String, dynamic>?;
+  }
+
+  Future<void> cacheRecommendationsSnapshot(Map<String, dynamic> recommendations) async {
+    _memoryCache.save('recommendations', recommendations);
+    await _localStorage.put('recommendations_snapshot', recommendations);
+  }
+
+  Map<String, dynamic>? getCachedRecommendations() {
+    return _memoryCache.retrieve('recommendations') ??
+        _localStorage.get('recommendations_snapshot') as Map<String, dynamic>?;
+  }
+
+  Future<void> persistCatalogAndRecommendations(Map<String, dynamic> catalog, Map<String, dynamic> recommendations) async {
+    await cacheCatalogSnapshot(catalog);
+    await cacheRecommendationsSnapshot(recommendations);
+  }
+
+  BrowseViewModel.init(this._memoryCache, this._localStorage) {
     _listingService = ListingService();
     _listenListings();
     _listenConfirmedSales();

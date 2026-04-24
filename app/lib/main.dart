@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'core/analytics_service.dart';
 import 'core/app_router.dart';
 import 'core/notification_service.dart';
+import 'core/lru_cache_service.dart';
 import 'core/theme/theme_context.dart';
 import 'view_models/browse_view_model.dart';
 import 'view_models/home_view_model.dart';
@@ -74,9 +75,15 @@ class UniMarketApp extends StatelessWidget {
 
         ChangeNotifierProvider(create: (_) => HomeViewModel()),
         ChangeNotifierProxyProvider<SessionViewModel, BrowseViewModel>(
-          create: (_) => BrowseViewModel(),
+          create: (_) {
+            final memoryCache = LruCacheService<String, dynamic>();
+            final localStorage = Hive.box<dynamic>('browse_view_model');
+            return BrowseViewModel(memoryCache, localStorage);
+          },
           update: (context, session, browse) {
-            browse ??= BrowseViewModel();
+            final memoryCache = LruCacheService<String, dynamic>();
+            final localStorage = Hive.box<dynamic>('browse_view_model');
+            browse ??= BrowseViewModel(memoryCache, localStorage);
             browse.reloadFavoritesForCurrentUser();
             return browse;
           },
