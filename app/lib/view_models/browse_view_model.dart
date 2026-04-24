@@ -10,6 +10,7 @@ import '../data/meetup_transaction_service.dart';
 import '../data/fyp_fav_relation_storage.dart';
 import 'package:hive/hive.dart';
 import '../core/lru_cache_service.dart';
+import 'dart:isolate';
 
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
@@ -23,7 +24,7 @@ class BrowseViewModel extends ChangeNotifier {
   StreamSubscription<List<Listing>>? _listingsSub;
   StreamSubscription<Set<String>>? _confirmedSalesSub;
   Set<String> _confirmedListingIds = {};
-  final Map<String, bool> _savedItems = {};
+  Map<String, bool> _savedItems = {}; // Declarar el campo _savedItems
   String _search = '';
   String _category = 'All';
   String _size = 'All';
@@ -105,12 +106,42 @@ class BrowseViewModel extends ChangeNotifier {
     await cacheRecommendationsSnapshot(recommendations);
   }
 
+  // Guarda las recomendaciones de FYP en Hive
+  Future<void> _cacheForYouRecommendations(List<Listing> recommendations) async {
+    final box = await Hive.openBox<List>('fyp_cache');
+    await box.put('cached_fyp', recommendations.map((listing) => listing.toJson()).toList());
+    debugPrint('Recomendaciones de FYP guardadas en Hive.');
+  }
+
+  // Recupera las recomendaciones de FYP desde Hive
+  Future<List<Listing>> _getCachedForYouRecommendations() async {
+    final box = await Hive.openBox<List>('fyp_cache');
+    final cachedData = box.get('cached_fyp', defaultValue: []);
+    return cachedData?.map<Listing>((json) => Listing.fromJson(json)).toList() ?? []; // Manejar el caso nulo
+  }
+
   BrowseViewModel.init()
       : _memoryCache = LruCacheService<String, dynamic>(),
         _localStorage = Hive.box<dynamic>('browse_view_model');
 
+  // Guarda los favoritos en Hive
+  Future<void> _cacheFavorites() async {
+    final box = await Hive.openBox<Map>('favorites_cache');
+    await box.put('cached_favorites', _savedItems);
+    debugPrint('Favoritos guardados en Hive.');
+  }
+
+  // Recupera los favoritos desde Hive
+  Future<void> _getCachedFavorites() async {
+    final box = await Hive.openBox<Map>('favorites_cache');
+    final cachedData = box.get('cached_favorites', defaultValue: {});
+    _savedItems = Map<String, bool>.from(cachedData ?? {}); // Manejar el caso nulo
+    debugPrint('Favoritos recuperados desde Hive: ${_savedItems.length} items.');
+  }
+
+  @override
   Future<void> reloadFavoritesForCurrentUser() async {
-    _savedItems.clear();
+    await _getCachedFavorites(); // Recuperar favoritos desde Hive
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (userId.isEmpty) {
       debugPrint('No connection. Adding operation to pending queue.');
@@ -122,6 +153,7 @@ class BrowseViewModel extends ChangeNotifier {
     for (final fypItemId in relations) {
       _savedItems[fypItemId] = true;
     }
+    await _cacheFavorites(); // Guardar favoritos en Hive
     notifyListeners();
   }
 
@@ -324,7 +356,35 @@ class BrowseViewModel extends ChangeNotifier {
     return allForYou;
   }
 
+  Future<List<Listing>> generateForYouRecommendations() async {
+    debugPrint('Generando recomendaciones para FYP...');
 
+    // Tarea 1: Calcular puntajes basados en favoritos
+    Future<List<Listing>> favoritesTask = Future(() {
+      debugPrint('Calculando puntajes basados en favoritos...');
+      final favoriteIds = _savedItems.entries.where((e) => e.value).map((e) => e.key).toSet();
+      return _listings.where((listing) => favoriteIds.contains(listing.id)).toList();
+    });
+
+    // Tarea 2: Calcular puntajes basados en búsquedas recientes
+    Future<List<Listing>> recentSearchesTask = Future(() {
+      debugPrint('Calculando puntajes basados en búsquedas recientes...');
+      return _listings.where((listing) => listing.tags.any((tag) => _search.contains(tag))).toList();
+    });
+
+    // Tarea 3: Calcular puntajes basados en tags
+    Future<List<Listing>> tagsTask = Future(() {
+      debugPrint('Calculando puntajes basados en tags...');
+      final interactedTags = _categoryInteractionCounts.keys.toSet();
+      return _listings.where((listing) => listing.tags.any((tag) => interactedTags.contains(tag))).toList();
+    });
+
+    final results = await Future.wait([favoritesTask, recentSearchesTask, tagsTask]);
+    final recommendations = results.expand((list) => list).toList();
+
+    await _cacheForYouRecommendations(recommendations); // Guardar en Hive
+    return recommendations;
+  }
 
   // New item counts per frequent category
   Map<String, int> get forYouNewItemCounts => _recommendationService.getNewItemCounts();
@@ -513,6 +573,39 @@ class BrowseViewModel extends ChangeNotifier {
         debugPrint('Failed to sync operation for item: $itemId. Retrying later.');
       }
     }
+  }
+
+  Future<void> performSearchWithIsolate(String query) async {
+    debugPrint('Starting search with isolate...');
+
+    // Crear un ReceivePort para recibir resultados del Isolate
+    final receivePort = ReceivePort();
+
+    // Crear un Isolate y pasarle los datos necesarios
+    await Isolate.spawn(_searchIsolateEntry, [query, _listings, receivePort.sendPort]);
+
+    // Escuchar los resultados del Isolate
+    receivePort.listen((filteredResults) {
+      debugPrint('Search results received from isolate: ${filteredResults.length} items.');
+      _listings = List<Listing>.from(filteredResults);
+      notifyListeners();
+    });
+  }
+
+  // Método que se ejecuta en el Isolate
+  static void _searchIsolateEntry(List<dynamic> args) {
+    final query = args[0] as String;
+    final listings = args[1] as List<Listing>;
+    final sendPort = args[2] as SendPort;
+
+    // Filtrar los productos según el query
+    final filteredResults = listings.where((listing) {
+      return listing.title.toLowerCase().contains(query.toLowerCase()) ||
+             listing.tags.any((tag) => tag.toLowerCase().contains(query.toLowerCase()));
+    }).toList();
+
+    // Enviar los resultados de vuelta al hilo principal
+    sendPort.send(filteredResults);
   }
 
   @override
