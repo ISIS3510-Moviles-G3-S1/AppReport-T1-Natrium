@@ -87,12 +87,9 @@ class BrowseViewModel extends ChangeNotifier {
     await cacheRecommendationsSnapshot(recommendations);
   }
 
-  BrowseViewModel.init(this._memoryCache, this._localStorage) {
-    _listingService = ListingService();
-    _listenListings();
-    _listenConfirmedSales();
-    reloadFavoritesForCurrentUser();
-  }
+  BrowseViewModel.init()
+      : _memoryCache = LruCacheService<String, dynamic>(),
+        _localStorage = Hive.box<dynamic>('browse_view_model');
 
   Future<void> reloadFavoritesForCurrentUser() async {
     _savedItems.clear();
