@@ -60,6 +60,8 @@ class BrowseViewModel extends ChangeNotifier {
   final LruCacheService<String, dynamic> _memoryCache;
   final Box<dynamic> _localStorage;
 
+  List<Map<String, dynamic>> _pendingOperations = [];
+
   BrowseViewModel(this._memoryCache, this._localStorage) {
     _listingService = ListingService();
     _listenListings();
@@ -111,6 +113,8 @@ class BrowseViewModel extends ChangeNotifier {
     _savedItems.clear();
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (userId.isEmpty) {
+      debugPrint('No connection. Adding operation to pending queue.');
+      _pendingOperations.add({'itemId': userId, 'isNowSaved': true});
       notifyListeners();
       return;
     }
@@ -196,22 +200,26 @@ class BrowseViewModel extends ChangeNotifier {
     _categoryInteractionCounts[cat] = (_categoryInteractionCounts[cat] ?? 0) + 1;
 
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (userId.isNotEmpty) {
-      if (isNowSaved) {
-        // Guardar relación en Hive
-        await _favStorage.addRelation(favId: userId, fypItemId: itemId);
-        AnalyticsService.instance.track(
-          AnalyticsEvent.userMeaningfulInteraction(
-            userId: userId,
-            interactionType: 'like',
-            timestamp: DateTime.now().toUtc().toIso8601String(),
-            category: cat,
-          ),
-        );
-      } else {
-        // Eliminar relación de Hive
-        await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
-      }
+    if (userId.isEmpty) {
+      debugPrint('No connection. Adding operation to pending queue.');
+      _pendingOperations.add({'itemId': itemId, 'isNowSaved': isNowSaved});
+      notifyListeners();
+      return;
+    }
+    if (isNowSaved) {
+      // Guardar relación en Hive
+      await _favStorage.addRelation(favId: userId, fypItemId: itemId);
+      AnalyticsService.instance.track(
+        AnalyticsEvent.userMeaningfulInteraction(
+          userId: userId,
+          interactionType: 'like',
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: cat,
+        ),
+      );
+    } else {
+      // Eliminar relación de Hive
+      await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
     }
 
     _updateRecommendationService();
@@ -480,6 +488,31 @@ class BrowseViewModel extends ChangeNotifier {
       return b.id.compareTo(a.id);
     });
     return filtered;
+  }
+
+  void _processPendingOperations() async {
+    if (_pendingOperations.isEmpty) return;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isEmpty) return;
+
+    debugPrint('Processing pending operations...');
+    for (final operation in List.from(_pendingOperations)) {
+      final itemId = operation['itemId'];
+      final isNowSaved = operation['isNowSaved'];
+
+      try {
+        if (isNowSaved) {
+          await _favStorage.addRelation(favId: userId, fypItemId: itemId);
+        } else {
+          await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
+        }
+        _pendingOperations.remove(operation);
+        debugPrint('Operation synced for item: $itemId');
+      } catch (e) {
+        debugPrint('Failed to sync operation for item: $itemId. Retrying later.');
+      }
+    }
   }
 
   @override
