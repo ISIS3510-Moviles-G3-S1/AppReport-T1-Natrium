@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 /// Firestore-backed listing status values.
 ///
@@ -191,6 +192,30 @@ class Listing {
           : _extractSizeFromTags(parsedTags),
       status: listingStatusToString(listingStatusFromString(data['status']?.toString())),
       saved: false,
+    );
+  }
+
+  /// Crea una instancia de Listing a partir de un mapa JSON.
+  static Listing fromJson(Map<String, dynamic> json) {
+    return Listing(
+      id: json['id'] ?? '',
+      sellerId: json['sellerId'] ?? '',
+      title: json['title'] ?? '',
+      price: json['price'] ?? 0,
+      conditionTag: json['conditionTag'] ?? '',
+      description: json['description'] ?? '',
+      sellerName: json['sellerName'] ?? '',
+      exchangeType: json['exchangeType'] ?? 'sell',
+      tags: _coerceStringList(json['tags']),
+      rating: (json['rating'] ?? 0).toDouble(),
+      imageName: json['imageName'] ?? '',
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
+      soldAt: json['soldAt'] != null ? DateTime.parse(json['soldAt']) : null,
+      imagePath: json['imagePath'] ?? '',
+      imageURLs: _coerceStringList(json['imageURLs']),
+      size: json['size'] ?? '',
+      status: json['status'] ?? 'active',
+      saved: json['saved'] ?? false,
     );
   }
 

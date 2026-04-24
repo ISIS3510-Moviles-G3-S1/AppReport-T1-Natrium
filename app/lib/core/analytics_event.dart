@@ -247,4 +247,16 @@ class AnalyticsEvent {
           'is_automatic': AnalyticsValue.boolType(preferenceMode == 'automatic'),
         },
       );
+
+  static AnalyticsEvent listingCreatedWithIATagging({
+    required String listingId,
+    required String userId,
+  }) => AnalyticsEvent(
+        name: 'listing_created_with_ia_tagging',
+        parameters: {
+          'listing_id': AnalyticsValue.string(listingId),
+          'user_id': AnalyticsValue.string(userId),
+          'timestamp': AnalyticsValue.string(DateTime.now().toUtc().toIso8601String()),
+        },
+      );
 }

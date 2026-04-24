@@ -8,12 +8,11 @@ import '../models/listing.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
 import '../data/fyp_fav_relation_storage.dart';
-
+import 'package:hive/hive.dart';
+import '../core/lru_cache_service.dart';
 
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
-
-
 
 class BrowseViewModel extends ChangeNotifier {
   final FypFavRelationStorage _favStorage = FypFavRelationStorage();
@@ -58,17 +57,64 @@ class BrowseViewModel extends ChangeNotifier {
 
   late RecommendationService _recommendationService;
 
-  BrowseViewModel() {
+  final LruCacheService<String, dynamic> _memoryCache;
+  final Box<dynamic> _localStorage;
+
+  List<Map<String, dynamic>> _pendingOperations = [];
+
+  BrowseViewModel(this._memoryCache, this._localStorage) {
     _listingService = ListingService();
     _listenListings();
-    _listenConfirmedSales();
-    reloadFavoritesForCurrentUser();
   }
+
+  Future<void> cacheCatalogSnapshot(Map<String, dynamic> catalog) async {
+    _memoryCache.save('catalog', catalog);
+    await _localStorage.put('catalog_snapshot', catalog);
+    print('Caching catalog snapshot: \\n');
+    print(catalog.toString());
+  }
+
+  Map<String, dynamic>? getCachedCatalog() {
+    return _memoryCache.retrieve('catalog') ??
+        _localStorage.get('catalog_snapshot') as Map<String, dynamic>?;
+  }
+
+  void logCachedCatalog() {
+    debugLogMessage('Retrieving cached catalog:');
+    final catalog = getCachedCatalog();
+    debugLogMessage(catalog?.toString() ?? 'No catalog found in cache.');
+  }
+
+  // Función global para logs de depuración
+  void debugLogMessage(String message) {
+    debugPrint(message);
+  }
+
+  Future<void> cacheRecommendationsSnapshot(Map<String, dynamic> recommendations) async {
+    _memoryCache.save('recommendations', recommendations);
+    await _localStorage.put('recommendations_snapshot', recommendations);
+  }
+
+  Map<String, dynamic>? getCachedRecommendations() {
+    return _memoryCache.retrieve('recommendations') ??
+        _localStorage.get('recommendations_snapshot') as Map<String, dynamic>?;
+  }
+
+  Future<void> persistCatalogAndRecommendations(Map<String, dynamic> catalog, Map<String, dynamic> recommendations) async {
+    await cacheCatalogSnapshot(catalog);
+    await cacheRecommendationsSnapshot(recommendations);
+  }
+
+  BrowseViewModel.init()
+      : _memoryCache = LruCacheService<String, dynamic>(),
+        _localStorage = Hive.box<dynamic>('browse_view_model');
 
   Future<void> reloadFavoritesForCurrentUser() async {
     _savedItems.clear();
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
     if (userId.isEmpty) {
+      debugPrint('No connection. Adding operation to pending queue.');
+      _pendingOperations.add({'itemId': userId, 'isNowSaved': true});
       notifyListeners();
       return;
     }
@@ -79,9 +125,22 @@ class BrowseViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _listenListings() {
-    _listingsSub = _listingService.getListings().listen((listings) {
+  void _listenListings() async {
+    debugPrint('Listening to listings...');
+    _listingsSub = _listingService.getListings().listen((listings) async {
+      debugPrint('Listings received:');
+      for (var listing in listings) {
+        debugPrint(listing.toString());
+      }
       _allListings = listings;
+      debugPrint('Total listings received: ${_allListings.length}');
+
+      await cacheCatalogSnapshot({
+        'listings': listings.map((listing) => listing.toJson()).toList(),
+      });
+      debugPrint('Catalog snapshot cached.');
+
+      debugPrint('Recomputing visible listings...');
       _recomputeVisibleListings();
     });
   }
@@ -94,11 +153,16 @@ class BrowseViewModel extends ChangeNotifier {
   }
 
   void _recomputeVisibleListings() {
-    _listings =
-        _allListings
-            .where((listing) => !listing.isSold)
-            .where((listing) => !_confirmedListingIds.contains(listing.id))
-            .toList();
+    debugPrint('Recomputing visible listings...');
+    _listings = _allListings
+        .where((listing) => !listing.isSold)
+        .where((listing) => !_confirmedListingIds.contains(listing.id))
+        .toList();
+
+    debugPrint('Filtered listings:');
+    for (var listing in _listings) {
+      debugPrint(listing.toString());
+    }
 
     for (final l in _listings) {
       _savedItems[l.id] = l.saved;
@@ -126,6 +190,9 @@ class BrowseViewModel extends ChangeNotifier {
 
   // User favorites an item
   Future<void> toggleSave(String itemId) async {
+    debugPrint('Toggling favorite for item: $itemId');
+    debugPrint('Current favorite state: ${_savedItems[itemId]}');
+
     _savedItems[itemId] = !_savedItems[itemId]!;
     final isNowSaved = _savedItems[itemId]!;
     final item = _listings.firstWhere((l) => l.id == itemId);
@@ -133,22 +200,26 @@ class BrowseViewModel extends ChangeNotifier {
     _categoryInteractionCounts[cat] = (_categoryInteractionCounts[cat] ?? 0) + 1;
 
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (userId.isNotEmpty) {
-      if (isNowSaved) {
-        // Guardar relación en Hive
-        await _favStorage.addRelation(favId: userId, fypItemId: itemId);
-        AnalyticsService.instance.track(
-          AnalyticsEvent.userMeaningfulInteraction(
-            userId: userId,
-            interactionType: 'like',
-            timestamp: DateTime.now().toUtc().toIso8601String(),
-            category: cat,
-          ),
-        );
-      } else {
-        // Eliminar relación de Hive
-        await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
-      }
+    if (userId.isEmpty) {
+      debugPrint('No connection. Adding operation to pending queue.');
+      _pendingOperations.add({'itemId': itemId, 'isNowSaved': isNowSaved});
+      notifyListeners();
+      return;
+    }
+    if (isNowSaved) {
+      // Guardar relación en Hive
+      await _favStorage.addRelation(favId: userId, fypItemId: itemId);
+      AnalyticsService.instance.track(
+        AnalyticsEvent.userMeaningfulInteraction(
+          userId: userId,
+          interactionType: 'like',
+          timestamp: DateTime.now().toUtc().toIso8601String(),
+          category: cat,
+        ),
+      );
+    } else {
+      // Eliminar relación de Hive
+      await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
     }
 
     _updateRecommendationService();
@@ -225,7 +296,7 @@ class BrowseViewModel extends ChangeNotifier {
     }
 
     // LOG: Show interacted tags
-    debugPrint('[ForYou] Interacted tags: ${interactedTags.join(", ")}');
+    print('[ForYou] Interacted tags: ${interactedTags.join(", ")}');
 
     // 3. Include all items with at least one tag similar to the interacted tags (using string similarity)
     const double similarityThreshold = 0.6; // You can adjust this value
@@ -236,7 +307,7 @@ class BrowseViewModel extends ChangeNotifier {
           final similarity = StringSimilarity.compareTwoStrings(
             tag.toLowerCase(), interactedTag.toLowerCase());
           if (similarity >= similarityThreshold) {
-            debugPrint('[ForYou] Similar: ${l.title} (tag: $tag) ~ $interactedTag (sim: $similarity)');
+            print('[ForYou] Similar: ${l.title} (tag: $tag) ~ $interactedTag (sim: $similarity)');
             return true;
           }
         }
@@ -248,7 +319,7 @@ class BrowseViewModel extends ChangeNotifier {
     final allForYou = [...interactedListings, ...similarListings];
 
     // LOG: Show how many items are recommended
-    debugPrint('[ForYou] Total recommendations: ${allForYou.length}');
+    print('[ForYou] Total recommendations: ${allForYou.length}');
 
     return allForYou;
   }
@@ -417,6 +488,31 @@ class BrowseViewModel extends ChangeNotifier {
       return b.id.compareTo(a.id);
     });
     return filtered;
+  }
+
+  void _processPendingOperations() async {
+    if (_pendingOperations.isEmpty) return;
+
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isEmpty) return;
+
+    debugPrint('Processing pending operations...');
+    for (final operation in List.from(_pendingOperations)) {
+      final itemId = operation['itemId'];
+      final isNowSaved = operation['isNowSaved'];
+
+      try {
+        if (isNowSaved) {
+          await _favStorage.addRelation(favId: userId, fypItemId: itemId);
+        } else {
+          await _favStorage.removeRelation(favId: userId, fypItemId: itemId);
+        }
+        _pendingOperations.remove(operation);
+        debugPrint('Operation synced for item: $itemId');
+      } catch (e) {
+        debugPrint('Failed to sync operation for item: $itemId. Retrying later.');
+      }
+    }
   }
 
   @override

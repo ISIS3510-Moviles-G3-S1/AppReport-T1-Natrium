@@ -12,6 +12,7 @@ import '../models/listing.dart';
 import '../core/analytics_event.dart';
 import '../core/analytics_service.dart';
 import '../core/image_analysis_service.dart';
+import 'package:hive/hive.dart';
 
 class ListingService {
   ListingService() {
@@ -61,23 +62,55 @@ class ListingService {
     return listing.createdAt;
   }
 
-  Stream<List<Listing>> getListings() {
-    return _db
-        .collection(_collection)
-        .snapshots()
-        .map((snapshot) {
-          final listings =
-              snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList();
-          listings.sort((a, b) {
-            final aCreated = a.createdAt;
-            final bCreated = b.createdAt;
-            if (aCreated == null && bCreated == null) return 0;
-            if (aCreated == null) return 1;
-            if (bCreated == null) return -1;
-            return bCreated.compareTo(aCreated);
+  // Almacena los listados en Hive
+  Future<void> _cacheListings(List<Listing> listings) async {
+    final box = await Hive.openBox<List>('listings_cache');
+    await box.put('cached_listings', listings.map((listing) => listing.toJson()).toList());
+    debugPrint('Cached ${listings.length} listings in Hive.');
+  }
+
+  // Recupera los listados desde Hive
+  Future<List<Listing>> _getCachedListings() async {
+    final box = await Hive.openBox<List>('listings_cache');
+    final cachedData = box.get('cached_listings', defaultValue: []) ?? [];
+    return cachedData.map<Listing>((json) => Listing.fromJson(json)).toList();
+  }
+
+  Stream<List<Listing>> getListings() async* {
+    final isOnline = await _isOnline();
+    debugPrint('Checking online status: $isOnline');
+
+    if (isOnline) {
+      debugPrint('Fetching listings from Firebase...');
+      yield* _db
+          .collection(_collection)
+          .snapshots()
+          .asyncMap((snapshot) async {
+            debugPrint('Firebase snapshot received with ${snapshot.docs.length} documents.');
+            final listings = snapshot.docs.map((doc) {
+              debugPrint('Document data: ${doc.data()}');
+              return Listing.fromFirestore(doc);
+            }).toList();
+
+            listings.sort((a, b) {
+              final aCreated = a.createdAt;
+              final bCreated = b.createdAt;
+              if (aCreated == null && bCreated == null) return 0;
+              if (aCreated == null) return 1;
+              if (bCreated == null) return -1;
+              return bCreated.compareTo(aCreated);
+            });
+
+            await _cacheListings(listings); // Almacenar en Hive
+            debugPrint('Listings cached in Hive.');
+            return listings;
           });
-          return listings;
-        });
+    } else {
+      debugPrint('Offline mode: Fetching cached listings from Hive...');
+      final cachedListings = await _getCachedListings();
+      debugPrint('Cached listings retrieved: ${cachedListings.length} items.');
+      yield cachedListings;
+    }
   }
 
   Stream<List<Listing>> getListingsBySellerId(String sellerId) {
@@ -157,8 +190,8 @@ class ListingService {
         'opId': _operationId(),
         'type': _typeCreate,
         'listingId': localId,
-        'sellerId': user.uid,
-        'listing': _serializeListingForQueue(listing, sellerId: user.uid),
+        'sellerId': user?.uid ?? 'unknown_user',
+        'listing': _serializeListingForQueue(listing, sellerId: user?.uid ?? 'unknown_user'),
         'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
         'pendingTags': shouldQueuePendingTags,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
@@ -167,7 +200,7 @@ class ListingService {
       return _cloneListingWith(
         listing,
         id: localId,
-        sellerId: user.uid,
+        sellerId: user?.uid ?? 'unknown_user',
         createdAt: DateTime.now(),
       );
     }
@@ -176,7 +209,7 @@ class ListingService {
       return await _createListingOnline(
         listing: listing,
         images: images,
-        sellerId: user.uid,
+        sellerId: user?.uid ?? 'unknown_user',
       );
     } catch (e) {
       debugPrint('[ListingService] createListing online failed, queueing offline: $e');
@@ -185,8 +218,8 @@ class ListingService {
         'opId': _operationId(),
         'type': _typeCreate,
         'listingId': localId,
-        'sellerId': user.uid,
-        'listing': _serializeListingForQueue(listing, sellerId: user.uid),
+        'sellerId': user?.uid ?? 'unknown_user',
+        'listing': _serializeListingForQueue(listing, sellerId: user?.uid ?? 'unknown_user'),
         'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
         'pendingTags': shouldQueuePendingTags,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
@@ -195,7 +228,7 @@ class ListingService {
       return _cloneListingWith(
         listing,
         id: localId,
-        sellerId: user.uid,
+        sellerId: user?.uid ?? 'unknown_user',
         createdAt: DateTime.now(),
       );
     }
@@ -231,6 +264,15 @@ class ListingService {
         timestamp: DateTime.now().toUtc().toIso8601String(),
       ),
     );
+
+    if (listing.tags.contains('IA_TAGGING')) {
+      AnalyticsService.instance.track(
+        AnalyticsEvent.listingCreatedWithIATagging(
+          listingId: listing.id,
+          userId: user?.uid ?? 'unknown_user',
+        ),
+      );
+    }
 
     final doc = await docRef.get();
     return Listing.fromFirestore(doc);
@@ -310,8 +352,10 @@ class ListingService {
   Future<bool> _isOnline() async {
     try {
       final result = await Connectivity().checkConnectivity();
+      debugPrint('Connectivity check result: $result');
       return _hasConnectivity(result);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error checking connectivity: $e');
       return true;
     }
   }
@@ -680,25 +724,27 @@ class ListingService {
         return 'image/jpeg';
     }
   }
-}
 
-List<String> _mergeAndFlattenTagMapsIsolate(List<Map<String, List<String>>> tagMaps) {
-  final output = <String>[];
+  User? get user => FirebaseAuth.instance.currentUser;
 
-  for (final tagMap in tagMaps) {
-    for (final key in const ['category', 'color', 'style', 'pattern']) {
-      output.addAll(tagMap[key] ?? const []);
+  List<String> _mergeAndFlattenTagMapsIsolate(List<Map<String, List<String>>> tagMaps) {
+    final output = <String>[];
+
+    for (final tagMap in tagMaps) {
+      for (final key in const ['category', 'color', 'style', 'pattern']) {
+        output.addAll(tagMap[key] ?? const []);
+      }
     }
-  }
 
-  final deduped = <String>[];
-  for (final tag in output) {
-    final value = tag.trim();
-    if (value.isEmpty) continue;
-    if (!deduped.contains(value)) {
-      deduped.add(value);
+    final deduped = <String>[];
+    for (final tag in output) {
+      final value = tag.trim();
+      if (value.isEmpty) continue;
+      if (!deduped.contains(value)) {
+        deduped.add(value);
+      }
     }
-  }
 
-  return deduped;
+    return deduped;
+  }
 }

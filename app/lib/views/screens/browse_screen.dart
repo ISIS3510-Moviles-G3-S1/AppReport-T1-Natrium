@@ -24,6 +24,10 @@ class BrowseScreen extends StatelessWidget {
         child: Consumer<BrowseViewModel>(
           builder: (context, vm, _) {
             final items = vm.filteredAndSorted;
+            debugPrint('Filtered and sorted items: \n');
+            for (var item in items) {
+              debugPrint(item.toString());
+            }
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
