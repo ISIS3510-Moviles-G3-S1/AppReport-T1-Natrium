@@ -187,7 +187,10 @@ class SessionViewModel extends ChangeNotifier {
         _profileCache.invalidate(uid);
         debugPrint('[SessionViewModel] LRU cache invalidated uid=$uid');
       }
-      await _clearPersistedUser();
+      // Intentionally do NOT clear SharedPreferences here.
+      // Keeping the last session in prefs allows offline login to restore it
+      // after the user has signed out and lost connectivity.
+      // Prefs are overwritten on the next successful online sign-in/sign-up.
       await _auth.signOut();
       _setUser(null);
     } on FirebaseAuthException catch (e) {
@@ -209,6 +212,34 @@ class SessionViewModel extends ChangeNotifier {
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   // PUBLIC CACHE ACCESS
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+  /// Restores the last session from SharedPreferences and warms the LRU cache.
+  /// Use when the device is offline and no Firebase call can be made.
+  /// Throws [AuthFailure] with code 'no-cached-user' if no persisted session
+  /// is found (i.e. the user has never logged in on this device before).
+  Future<void> signInOffline() async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final user = await getCachedSessionUser();
+      if (user == null) {
+        throw const AuthFailure(
+          'No saved session found. Please connect to the internet and log in.',
+          code: 'no-cached-user',
+        );
+      }
+      _setUser(user);
+      debugPrint('[SessionViewModel] signInOffline restored uid=${user.uid}');
+    } on AuthFailure {
+      rethrow;
+    } catch (e) {
+      const failure = AuthFailure('Offline login failed. Please try again.');
+      _setError(failure.message);
+      throw failure;
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   /// Returns the AppUser persisted in SharedPreferences from the last session.
   Future<AppUser?> getCachedSessionUser() async {

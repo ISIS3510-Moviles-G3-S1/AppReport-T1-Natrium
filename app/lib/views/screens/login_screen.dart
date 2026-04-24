@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -19,11 +22,41 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // ── Connectivity ──────────────────────────────────────────────────────────
+  bool _isOffline = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
   @override
   void initState() {
     super.initState();
     _emailController.addListener(_clearError);
     _passwordController.addListener(_clearError);
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    // Snapshot the current connectivity state on screen open.
+    final initial = await Connectivity().checkConnectivity();
+    if (mounted) {
+      setState(() => _isOffline = _isDisconnected(initial));
+    }
+
+    // Subscribe to changes for the lifetime of this screen.
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (mounted) {
+        setState(() => _isOffline = _isDisconnected(results));
+      }
+    });
+  }
+
+  bool _isDisconnected(dynamic result) {
+    if (result is List<ConnectivityResult>) {
+      return result.every((r) => r == ConnectivityResult.none);
+    }
+    if (result is ConnectivityResult) {
+      return result == ConnectivityResult.none;
+    }
+    return false;
   }
 
   @override
@@ -32,6 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.removeListener(_clearError);
     _emailController.dispose();
     _passwordController.dispose();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 
@@ -50,8 +84,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
 
+  // Restores the last persisted session from SharedPreferences + LRU when offline.
+  Future<void> _loginOffline() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await context.read<SessionViewModel>().signInOffline();
+    } on AuthFailure catch (failure) {
+      _setAuthError(failure.message);
+    } catch (e) {
+      _setAuthError('Could not restore offline session. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   ///LOGIN
   Future<void> _login() async {
+    if (_isOffline) {
+      _setValidationError('No internet connection. Please check your network.');
+      return;
+    }
+
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
@@ -157,140 +213,194 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Online login requires connectivity; offline login only requires no active request.
+    final bool canSubmit = !_isLoading;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(
-                24,
-                24,
-                24,
-                24 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: ConstrainedBox(
-                constraints:
-                    BoxConstraints(minHeight: constraints.maxHeight - 48),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 40),
-
-                    /// LOGO
-                    Column(
-                      children: [
-                        Image.asset(
-                          'assets/images/uni_market_logo.png',
-                          height: 60,
-                          width: 60,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          "UniMarket",
+        child: Column(
+          children: [
+            // ── Offline banner ─────────────────────────────────────────────
+            // AnimatedContainer gives a smooth slide-in/out transition when
+            // connectivity changes, making the state change obvious to the user.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              height: _isOffline ? 48 : 0,
+              color: const Color(0xFFF59E0B), // amber-500
+              child: _isOffline
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.wifi_off_rounded,
+                            size: 18, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'No internet connection',
                           style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
                         ),
                       ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            // ── Main content ───────────────────────────────────────────────
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      24,
+                      24,
+                      24 + MediaQuery.of(context).viewInsets.bottom,
                     ),
+                    child: ConstrainedBox(
+                      constraints:
+                          BoxConstraints(minHeight: constraints.maxHeight - 48),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 40),
 
-                    const SizedBox(height: 40),
-
-                    /// TITLE
-                    const Text(
-                      "Welcome back",
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      "Log in to continue buying and selling on UniMarket.",
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    /// EMAIL
-                    TextField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(
-                        labelText: "University Email",
-                        hintText: "username@uniandes.edu.co",
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    /// PASSWORD
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: "Password",
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    /// LOGIN BUTTON
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text("Log in"),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Error banner
-                    if (_errorMessage != null)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                          /// LOGO
+                          Column(
+                            children: [
+                              Image.asset(
+                                'assets/images/uni_market_logo.png',
+                                height: 60,
+                                width: 60,
+                                fit: BoxFit.contain,
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "UniMarket",
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+
+                          const SizedBox(height: 40),
+
+                          /// TITLE
+                          const Text(
+                            "Welcome back",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          const Text(
+                            "Log in to continue buying and selling on UniMarket.",
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          /// EMAIL
+                          TextField(
+                            controller: _emailController,
+                            enabled: !_isOffline,
+                            decoration: const InputDecoration(
+                              labelText: "University Email",
+                              hintText: "username@uniandes.edu.co",
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          /// PASSWORD
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            enabled: !_isOffline,
+                            decoration: const InputDecoration(
+                              labelText: "Password",
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          /// LOGIN BUTTON
+                          ElevatedButton(
+                            onPressed: canSubmit
+                                ? (_isOffline ? _loginOffline : _login)
+                                : null,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(_isOffline ? 'Continue offline' : 'Log in'),
+                          ),
+
+                          // Hint shown below button when offline.
+                          if (_isOffline)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 6),
+                              child: Text(
+                                'Your last saved session will be restored.',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+
+                          const SizedBox(height: 16),
+
+                          // Error banner
+                          if (_errorMessage != null)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+
+                          if (_errorMessage != null) const SizedBox(height: 16),
+
+                          /// REGISTER
+                          TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    context.go('/register');
+                                  },
+                            child: const Text("Create an account"),
+                          ),
+                        ],
                       ),
-
-                    if (_errorMessage != null) const SizedBox(height: 16),
-
-                    /// REGISTER
-                    TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              context.go('/register');
-                            },
-                      child: const Text("Create an account"),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
