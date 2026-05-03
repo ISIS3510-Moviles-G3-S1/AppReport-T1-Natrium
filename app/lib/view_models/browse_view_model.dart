@@ -8,15 +8,45 @@ import '../models/listing.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
 import '../data/fyp_fav_relation_storage.dart';
+import '../data/search_history_storage.dart';
 import 'package:hive/hive.dart';
 import '../core/lru_cache_service.dart';
 import 'dart:isolate';
-
 import '../core/recommendation_service.dart';
 import '../core/recommendation_system.dart';
 
 class BrowseViewModel extends ChangeNotifier {
+    // --- Search Results Cache ---
+    // Guarda los resultados de búsqueda por query (en memoria y Hive)
+    Future<void> cacheSearchResults(String query, List<Listing> results) async {
+      _memoryCache.save('search_result_\u001f$query', results.map((e) => e.toJson()).toList());
+      final box = await Hive.openBox<List>('search_results_cache');
+      await box.put('search_result_\u001f$query', results.map((e) => e.toJson()).toList());
+    }
+
+    // Recupera resultados cacheados para una query
+    Future<List<Listing>?> getCachedSearchResults(String query) async {
+      final mem = _memoryCache.retrieve('search_result_\u001f$query');
+      if (mem != null) {
+        return (mem as List).map((json) => Listing.fromJson(json)).toList();
+      }
+      final box = await Hive.openBox<List>('search_results_cache');
+      final cached = box.get('search_result_\u001f$query');
+      if (cached != null) {
+        return (cached as List).map((json) => Listing.fromJson(json)).toList();
+      }
+      return null;
+    }
   final FypFavRelationStorage _favStorage = FypFavRelationStorage();
+  final SearchHistoryStorage _searchHistoryStorage = SearchHistoryStorage();
+  final LruCacheService<String, dynamic> _memoryCache = LruCacheService<String, dynamic>();
+  final Box<dynamic> _localStorage = Hive.box<dynamic>('browse_view_model');
+  // Llama esto cuando el usuario realiza una búsqueda
+  Future<void> saveSearchHistoryAndCache(String query, List<Listing> results) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    await _searchHistoryStorage.addSearch(query: query, userId: userId);
+    await cacheSearchResults(query, results);
+  }
   List<Listing> _listings = [];
   List<Listing> _allListings = [];
   late ListingService _listingService;
@@ -58,12 +88,9 @@ class BrowseViewModel extends ChangeNotifier {
 
   late RecommendationService _recommendationService;
 
-  final LruCacheService<String, dynamic> _memoryCache;
-  final Box<dynamic> _localStorage;
-
   List<Map<String, dynamic>> _pendingOperations = [];
 
-  BrowseViewModel(this._memoryCache, this._localStorage) {
+  BrowseViewModel() {
     _listingService = ListingService();
     _listenListings();
   }
@@ -120,9 +147,6 @@ class BrowseViewModel extends ChangeNotifier {
     return cachedData?.map<Listing>((json) => Listing.fromJson(json)).toList() ?? []; // Manejar el caso nulo
   }
 
-  BrowseViewModel.init()
-      : _memoryCache = LruCacheService<String, dynamic>(),
-        _localStorage = Hive.box<dynamic>('browse_view_model');
 
   // Guarda los favoritos en Hive
   Future<void> _cacheFavorites() async {
@@ -473,6 +497,8 @@ class BrowseViewModel extends ChangeNotifier {
   String get search => _search;
   set search(String v) {
     _search = v;
+    // Guardar historial y cachear resultados actuales si hay
+    saveSearchHistoryAndCache(v, _listings);
     notifyListeners();
   }
 
