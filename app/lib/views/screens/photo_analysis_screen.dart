@@ -1,3 +1,7 @@
+import 'dart:convert';
+import '../../core/photo_quality_analyzer.dart';
+import '../../data/pending_photo_analysis_storage.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,28 +54,74 @@ class _PhotoAnalysisScreenState extends State<PhotoAnalysisScreen> {
     setState(() {
       loading = true;
     });
-    try {
-      // Run vision analysis
-      final visionService = VisionPhotoQualityService();
-      final result = await visionService.analyzePhoto(widget.photo);
-      if (!mounted) return;
-      setState(() {
-        visionResult = result;
-      });
-      await _analyzeFraming();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        visionResult = VisionPhotoQualityResult(
-          isBlurry: false,
-          isUnderexposed: false,
-          isOverexposed: false,
-          blurLikelihood: 0.0,
-          exposureLikelihood: 0.5,
-          error: 'Unable to analyze right now.',
+    final connectivity = Connectivity();
+    final connectivityResults = await connectivity.checkConnectivity();
+    final isOnline = connectivityResults.isNotEmpty && !connectivityResults.contains(ConnectivityResult.none);
+    if (isOnline) {
+      try {
+        // Run vision analysis (cloud)
+        final visionService = VisionPhotoQualityService();
+        final result = await visionService.analyzePhoto(widget.photo);
+        if (!mounted) return;
+        setState(() {
+          visionResult = result;
+        });
+        await _analyzeFraming();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          visionResult = VisionPhotoQualityResult(
+            isBlurry: false,
+            isUnderexposed: false,
+            isOverexposed: false,
+            blurLikelihood: 0.0,
+            exposureLikelihood: 0.5,
+            error: 'Unable to analyze right now.',
+          );
+          loading = false;
+        });
+      }
+    } else {
+      // Offline: usar analizador local y guardar para sync
+      try {
+        final file = File(widget.photo.path);
+        final localResult = await PhotoQualityAnalyzer.analyze(file);
+        if (!mounted) return;
+        setState(() {
+          visionResult = VisionPhotoQualityResult(
+            isBlurry: localResult.issues.contains('BLURRY'),
+            isUnderexposed: localResult.issues.contains('LOW_LIGHT'),
+            isOverexposed: false, // local analyzer no detecta sobreexposición
+            blurLikelihood: localResult.issues.contains('BLURRY') ? 0.2 : 0.0,
+            exposureLikelihood: 0.5, // valor aproximado
+            error: 'Offline analysis',
+          );
+        });
+        // Guardar en pending_photo_analysis_storage
+        final bytes = await file.readAsBytes();
+        final pending = PendingPhotoAnalysis(
+          userId: 'offline', // TODO: reemplazar por user real si está disponible
+          filePath: file.path,
+          imageBytes: bytes,
+          localResultJson: jsonEncode(localResult.toJson()),
+          timestamp: DateTime.now().millisecondsSinceEpoch,
         );
-        loading = false;
-      });
+        await PendingPhotoAnalysisStorage().insert(pending);
+        await _analyzeFraming();
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          visionResult = VisionPhotoQualityResult(
+            isBlurry: false,
+            isUnderexposed: false,
+            isOverexposed: false,
+            blurLikelihood: 0.0,
+            exposureLikelihood: 0.5,
+            error: 'Unable to analyze offline: $e',
+          );
+          loading = false;
+        });
+      }
     }
   }
 

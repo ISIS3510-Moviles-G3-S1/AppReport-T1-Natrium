@@ -1,3 +1,4 @@
+import '../widgets/review_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -96,6 +97,8 @@ class ItemDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  if (item != null) ReviewSection(productId: item.id),
                   const SizedBox(height: 24),
                   _SimilarSection(vm: vm),
                 ],
