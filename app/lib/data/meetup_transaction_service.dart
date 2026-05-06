@@ -149,6 +149,12 @@ class MeetupTransactionService {
         'confirmedAt': FieldValue.serverTimestamp(),
       });
 
+      final listingRef = _db.collection('listings').doc(meetupTx.listingId);
+      transaction.update(listingRef, {
+        'status': 'sold',
+        'soldAt': FieldValue.serverTimestamp(),
+      });
+
       return meetupTx.copyWith(
         status: MeetupTransactionStatus.confirmed,
         confirmedAt: DateTime.now(),

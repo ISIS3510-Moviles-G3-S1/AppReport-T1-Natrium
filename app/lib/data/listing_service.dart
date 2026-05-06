@@ -324,9 +324,10 @@ class ListingService {
   Future<Listing> createListing({
     required Listing listing,
     required List<XFile> images,
+    bool? knownOnline,
   }) async {
     final shouldQueuePendingTags = listing.tags.isEmpty && images.isNotEmpty;
-    final isOnline = await _isOnline();
+    final isOnline = knownOnline ?? await _isOnline();
 
     final user = FirebaseAuth.instance.currentUser;
     final canCreateRemote = isOnline && _canUseFirestore(user);

@@ -198,6 +198,14 @@ class BrowseViewModel extends ChangeNotifier {
 
       debugPrint('Recomputing visible listings...');
       _recomputeVisibleListings();
+    }, onError: (error, stackTrace) async {
+      debugPrint('[BrowseVM] listings stream failed, falling back to cache: $error');
+      final cachedListings = await _listingService.getListings().first;
+      _allListings = cachedListings;
+      await cacheCatalogSnapshot({
+        'listings': cachedListings.map((listing) => listing.toJson()).toList(),
+      });
+      _recomputeVisibleListings();
     });
   }
 
@@ -205,13 +213,17 @@ class BrowseViewModel extends ChangeNotifier {
     _confirmedSalesSub = _meetupService.watchConfirmedListingIds().listen((ids) {
       _confirmedListingIds = ids;
       _recomputeVisibleListings();
+    }, onError: (error, stackTrace) {
+      debugPrint('[BrowseVM] confirmed sales stream failed: $error');
+      _confirmedListingIds = {};
+      _recomputeVisibleListings();
     });
   }
 
   void _recomputeVisibleListings() {
     debugPrint('Recomputing visible listings...');
     _listings = _allListings
-        .where((listing) => !listing.isSold)
+        .where((listing) => listing.isAvailable)
         .where((listing) => !_confirmedListingIds.contains(listing.id))
         .toList();
 

@@ -254,7 +254,7 @@ class SellViewModel extends ChangeNotifier {
     );
     debugPrint('[SellVM] publishing ${_images.length} selected images');
     final isOnline = await _listingService.isOnlineNow();
-    await _listingService.createListing(listing: listing, images: _images);
+    await _listingService.createListing(listing: listing, images: _images, knownOnline: isOnline);
     _published = true;
     _publishedOffline = !isOnline;
     // Track if AI tags will be generated offline (no tags provided + has images + offline)

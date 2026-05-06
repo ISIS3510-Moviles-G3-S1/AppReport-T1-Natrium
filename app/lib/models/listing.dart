@@ -80,6 +80,7 @@ class Listing {
   ListingStatus get listingStatus => listingStatusFromString(status);
   bool get isSold => listingStatus == ListingStatus.sold;
   bool get isActive => listingStatus == ListingStatus.active;
+  bool get isAvailable => !isSold;
 
   Listing copyWith({
     bool? saved,
