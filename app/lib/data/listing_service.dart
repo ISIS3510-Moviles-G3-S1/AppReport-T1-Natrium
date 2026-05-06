@@ -284,11 +284,13 @@ class ListingService {
     required Listing listing,
     required List<XFile> images,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not authenticated');
-
     final shouldQueuePendingTags = listing.tags.isEmpty && images.isNotEmpty;
     final isOnline = await _isOnline();
+
+    // For offline users with cached sessions, allow listing creation to queue.
+    // Firebase auth check only applies when online.
+    final user = isOnline ? FirebaseAuth.instance.currentUser : null;
+    final userId = user?.uid ?? 'unknown_user';
 
     if (!isOnline) {
       final localId = _localListingId();
@@ -296,8 +298,8 @@ class ListingService {
         'opId': _operationId(),
         'type': _typeCreate,
         'listingId': localId,
-        'sellerId': user?.uid ?? 'unknown_user',
-        'listing': _serializeListingForQueue(listing, sellerId: user?.uid ?? 'unknown_user'),
+        'sellerId': userId,
+        'listing': _serializeListingForQueue(listing, sellerId: userId),
         'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
         'pendingTags': shouldQueuePendingTags,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
@@ -306,16 +308,19 @@ class ListingService {
       return _cloneListingWith(
         listing,
         id: localId,
-        sellerId: user?.uid ?? 'unknown_user',
+        sellerId: userId,
         createdAt: DateTime.now(),
       );
     }
+
+    // Online: ensure user is authenticated with Firebase
+    if (user == null) throw Exception('User not authenticated');
 
     try {
       return await _createListingOnline(
         listing: listing,
         images: images,
-        sellerId: user?.uid ?? 'unknown_user',
+        sellerId: user.uid,
       );
     } catch (e) {
       debugPrint('[ListingService] createListing online failed, queueing offline: $e');
@@ -324,8 +329,8 @@ class ListingService {
         'opId': _operationId(),
         'type': _typeCreate,
         'listingId': localId,
-        'sellerId': user?.uid ?? 'unknown_user',
-        'listing': _serializeListingForQueue(listing, sellerId: user?.uid ?? 'unknown_user'),
+        'sellerId': user.uid,
+        'listing': _serializeListingForQueue(listing, sellerId: user.uid),
         'imagePaths': images.map((e) => e.path).where((e) => e.trim().isNotEmpty).toList(),
         'pendingTags': shouldQueuePendingTags,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
@@ -334,7 +339,7 @@ class ListingService {
       return _cloneListingWith(
         listing,
         id: localId,
-        sellerId: user?.uid ?? 'unknown_user',
+        sellerId: user.uid,
         createdAt: DateTime.now(),
       );
     }
@@ -531,7 +536,36 @@ class ListingService {
     if (listingRaw is! Map) return null;
 
     final listingMap = Map<String, dynamic>.from(listingRaw);
-    final sellerId = op['sellerId']?.toString() ?? listingMap['sellerId']?.toString() ?? '';
+    final queuedSellerId = op['sellerId']?.toString() ?? listingMap['sellerId']?.toString() ?? '';
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
+    // Security: validate seller ownership during sync
+    // - If queued as 'unknown_user' (created offline): require current user to sync it
+    //   (only the user who created it offline can sync it by being logged in)
+    // - If queued with specific UID: require current user to match that UID
+    //   (prevents user impersonation across devices/sessions)
+    if (queuedSellerId == 'unknown_user') {
+      if (currentUser == null) {
+        throw StateError(
+          'Cannot sync offline-created listing: no user is authenticated. '
+          'Log in to sync this listing.',
+        );
+      }
+      debugPrint('[ListingService] Syncing offline-created listing with current user ${currentUser.uid}');
+    } else if (currentUser == null) {
+      throw StateError(
+        'Cannot sync listing: authentication required. '
+        'Log in as the user who created this listing.',
+      );
+    } else if (queuedSellerId != currentUser.uid) {
+      throw StateError(
+        'Cannot sync this listing: it was created by a different user. '
+        'Log in as the original user to sync this listing.',
+      );
+    }
+
+    // Use current authenticated user's UID (now guaranteed to be set)
+    final sellerId = currentUser!.uid;
     final shouldGeneratePendingTags = op['pendingTags'] == true;
 
     final imagePaths = (op['imagePaths'] as List?)
