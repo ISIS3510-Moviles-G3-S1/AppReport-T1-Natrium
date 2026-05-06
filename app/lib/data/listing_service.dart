@@ -121,6 +121,13 @@ class ListingService {
     return LinkedHashMap<String, Map<String, dynamic>>.from(cache);
   }
 
+  // Sync summary events emitted after pending operations are processed.
+
+  final StreamController<SyncSummary> _syncController = StreamController<SyncSummary>.broadcast();
+  Stream<SyncSummary> get syncSummaryStream => _syncController.stream;
+
+ 
+
   static void _touchListingCache(
     LinkedHashMap<String, Map<String, dynamic>> cache,
     String listingId,
@@ -154,7 +161,16 @@ class ListingService {
       await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
     }
 
-    return trimmed.values.map(Listing.fromJson).toList();
+    // Exclude listings that are soft-deleted (status == 'deleted') so UI doesn't show them.
+    final results = <Listing>[];
+    for (final entry in trimmed.values) {
+      final map = Map<String, dynamic>.from(entry);
+      final status = (map['status'] ?? '').toString().trim().toLowerCase();
+      if (status == 'deleted' || status == 'deleted_pending') continue;
+      results.add(Listing.fromJson(map));
+    }
+
+    return results;
   }
 
   /// Helper for tests: trim a LinkedHashMap in LRU order and return kept keys.
@@ -279,6 +295,20 @@ class ListingService {
   }
 
   Future<void> _removeCachedListing(String listingId) async {
+    if (listingId.trim().isEmpty) return;
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+    final existing = cache[listingId];
+    if (existing != null && existing is Map<String, dynamic>) {
+      existing['status'] = 'deleted_pending';
+      cache[listingId] = existing;
+    }
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+    await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+  }
+
+  Future<void> _purgeCachedListing(String listingId) async {
+    if (listingId.trim().isEmpty) return;
     final box = await Hive.openBox(_listedCacheBoxName);
     final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
     cache.remove(listingId);
@@ -558,6 +588,11 @@ class ListingService {
       final queue = await _loadQueue();
       if (queue.isEmpty) return;
 
+      int createdCount = 0;
+      int updatedCount = 0;
+      int deletedCount = 0;
+      int aiTaggedCount = 0;
+
       final idMap = <String, String>{};
       final remaining = <Map<String, dynamic>>[];
 
@@ -572,16 +607,24 @@ class ListingService {
             if (createdId != null && originalListingId != createdId) {
               idMap[originalListingId] = createdId;
             }
+            createdCount++;
+            if (op['_aiTagged'] == true) aiTaggedCount++;
             continue;
           }
 
           if (type == _typeUpdate) {
             await _applyUpdateOperation(op, listingIdOverride: resolvedListingId);
+            updatedCount++;
             continue;
           }
 
           if (type == _typeDelete) {
             await _applyDeleteOperation(op, listingIdOverride: resolvedListingId);
+            deletedCount++;
+            // Remove from cache fully after remote delete succeeds
+            if (!resolvedListingId.startsWith('local_')) {
+              await _purgeCachedListing(resolvedListingId);
+            }
             continue;
           }
 
@@ -593,6 +636,19 @@ class ListingService {
       }
 
       await _saveQueue(remaining);
+
+      // Emit a sync summary event if any operations completed
+      if (createdCount + updatedCount + deletedCount + aiTaggedCount > 0) {
+        try {
+          _syncController.add(SyncSummary(
+            created: createdCount,
+            updated: updatedCount,
+            deleted: deletedCount,
+            aiTagged: aiTaggedCount,
+          ));
+          debugPrint('[ListingService] Sync summary emitted: created=$createdCount updated=$updatedCount deleted=$deletedCount aiTagged=$aiTaggedCount');
+        } catch (_) {}
+      }
     } finally {
       _syncInProgress = false;
     }
@@ -676,10 +732,11 @@ class ListingService {
     }
 
     if (shouldGeneratePendingTags) {
-      await _generateAndUpdateTags(
+      final aiResult = await _generateAndUpdateTags(
         listingId: remoteListingId,
         imagePaths: imagePaths,
       );
+      if (aiResult) op['_aiTagged'] = true;
     }
 
     return remoteListingId;
@@ -724,17 +781,17 @@ class ListingService {
     await _removeCachedListing(listingIdOverride);
   }
 
-  Future<void> _generateAndUpdateTags({
+  Future<bool> _generateAndUpdateTags({
     required String listingId,
     required List<String> imagePaths,
   }) async {
-    if (imagePaths.isEmpty) return;
+    if (imagePaths.isEmpty) return false;
 
     final pathsToAnalyze = imagePaths
         .where((path) => path.trim().isNotEmpty)
         .take(_maxAiTagImages)
         .toList(growable: false);
-    if (pathsToAnalyze.isEmpty) return;
+    if (pathsToAnalyze.isEmpty) return false;
 
     try {
       final tagMapTasks = pathsToAnalyze
@@ -766,16 +823,18 @@ class ListingService {
         serializableTagMaps,
       );
 
-      if (generatedTags.isEmpty) return;
+      if (generatedTags.isEmpty) return false;
 
       await _db.collection(_collection).doc(listingId).update({
         'tags': generatedTags,
         'tagsPending': false,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      return true;
     } catch (e) {
       debugPrint('[ListingService] pending AI tag generation failed for $listingId: $e');
-      rethrow;
+      return false;
     }
   }
 
@@ -966,4 +1025,19 @@ class ListingService {
 
     return deduped;
   }
+}
+
+class SyncSummary {
+  final int created;
+  final int updated;
+  final int deleted;
+  final int aiTagged;
+  final DateTime timestamp;
+
+  SyncSummary({
+    required this.created,
+    required this.updated,
+    required this.deleted,
+    required this.aiTagged,
+  }) : timestamp = DateTime.now();
 }
