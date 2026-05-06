@@ -802,7 +802,7 @@ class _SellerCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundImage: NetworkImage(seller.avatar),
+            backgroundImage: CachedNetworkImageProvider(seller.avatar),
             onBackgroundImageError: (_, __) {},
             child: Text(
               seller.name.substring(0, 2).toUpperCase(),

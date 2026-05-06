@@ -230,6 +230,9 @@ class BrowseViewModel extends ChangeNotifier {
   }
 
   void _updateRecommendationService() {
+    // Auto-update registered preferences based on user interactions
+    _updateRegisteredPreferencesFromInteractions();
+    
     // Sort categories by interaction count
     final sortedCategories = _categoryInteractionCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -241,6 +244,54 @@ class BrowseViewModel extends ChangeNotifier {
       newThreshold: DateTime.now().subtract(Duration(days: 5)), // Items uploaded in last 5 days
     );
     notifyListeners();
+  }
+
+  void _updateRegisteredPreferencesFromInteractions() {
+    // Extract style preferences from items the user has favorited or viewed
+    final interactedIds = <String>{}
+      ..addAll(_savedItems.entries.where((e) => e.value).map((e) => e.key))
+      ..addAll(_viewedItemIds)
+      ..addAll(_purchasedItemIds);
+
+    if (interactedIds.isEmpty) {
+      print('[Prefs] No user interactions yet, keeping hardcoded defaults');
+      return;
+    }
+
+    final interactedListings = _listings.where((l) => interactedIds.contains(l.id)).toList();
+
+    // Extract all tags from interacted items
+    final allTags = <String>{};
+    for (final item in interactedListings) {
+      allTags.addAll(item.tags.where((t) => t.trim().isNotEmpty));
+    }
+
+    if (allTags.isNotEmpty) {
+      // Take top tags (sort by frequency)
+      final tagFrequency = <String, int>{};
+      for (final item in interactedListings) {
+        for (final tag in item.tags.where((t) => t.trim().isNotEmpty)) {
+          tagFrequency[tag] = (tagFrequency[tag] ?? 0) + 1;
+        }
+      }
+
+      // Get top 3 tags by frequency
+      final topTags = tagFrequency.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      
+      _registeredStylePreferences = topTags.take(3).map((e) => e.key).toList(growable: false);
+      print('[Prefs] Auto-detected style preferences: $_registeredStylePreferences');
+    }
+
+    // Extract size preferences from interacted items
+    for (final item in interactedListings) {
+      final itemSize = _extractListingSize(item);
+      if (itemSize.isNotEmpty) {
+        _registeredSize = itemSize;
+        print('[Prefs] Auto-detected size preference: $_registeredSize');
+        break; // Use the first item's size we find
+      }
+    }
   }
 
 
@@ -457,34 +508,76 @@ class BrowseViewModel extends ChangeNotifier {
   }
 
   bool _hasStyleMatch(Listing listing) {
-    if (_registeredStylePreferences.isEmpty) return false;
+    if (_registeredStylePreferences.isEmpty) {
+      print('[Match] Style check FAILED: No registered preferences');
+      return false;
+    }
 
     final preferred = _registeredStylePreferences
         .map((e) => e.trim().toLowerCase())
         .where((e) => e.isNotEmpty)
         .toSet();
-    if (preferred.isEmpty) return false;
+    if (preferred.isEmpty) {
+      print('[Match] Style check FAILED: Preferred set is empty');
+      return false;
+    }
 
     final listingTags = listing.tags
         .map((e) => e.trim().toLowerCase())
         .where((e) => e.isNotEmpty)
         .toSet();
-    return listingTags.any(preferred.contains);
+    
+    final hasMatch = listingTags.any(preferred.contains);
+    if (!hasMatch) {
+      print('[Match] ${listing.title}: tags=$listingTags vs preferred=$preferred = NO MATCH');
+    } else {
+      print('[Match] ${listing.title}: tags=$listingTags vs preferred=$preferred = STYLE MATCH ✓');
+    }
+    return hasMatch;
   }
 
   bool _hasSizeMatch(Listing listing) {
     final registered = _normalizeSize(_registeredSize);
-    if (registered.isEmpty) return false;
+    if (registered.isEmpty) {
+      print('[Match] Size check FAILED: Registered size is empty (raw: $_registeredSize)');
+      return false;
+    }
     final listingSize = _extractListingSize(listing);
-    return listingSize.isNotEmpty && listingSize == registered;
+    final hasMatch = listingSize.isNotEmpty && listingSize == registered;
+    
+    if (!hasMatch) {
+      print('[Match] ${listing.title}: item_size=$listingSize vs registered=$registered = NO MATCH');
+    } else {
+      print('[Match] ${listing.title}: item_size=$listingSize vs registered=$registered = SIZE MATCH ✓');
+    }
+    return hasMatch;
   }
 
   bool isRecommendationMatch(Listing listing) {
-    return _hasStyleMatch(listing) && _hasSizeMatch(listing);
+    final styleMatch = _hasStyleMatch(listing);
+    final sizeMatch = _hasSizeMatch(listing);
+    final result = styleMatch && sizeMatch;
+    if (result) {
+      print('[Match] ✓✓✓ ${listing.title} is a FULL MATCH ✓✓✓');
+    }
+    return result;
   }
 
   int countRecommendationMatches(Iterable<Listing> recommendations) {
-    return recommendations.where(isRecommendationMatch).length;
+    print('\n[Match] ========== Starting match count ==========');
+    print('[Match] Registered preferences: $_registeredStylePreferences');
+    print('[Match] Registered size: $_registeredSize');
+    print('[Match] Total items to check: ${recommendations.length}');
+    
+    int count = 0;
+    for (final listing in recommendations) {
+      if (isRecommendationMatch(listing)) {
+        count++;
+      }
+    }
+    
+    print('[Match] ========== Final result: $count / ${recommendations.length} matches ==========\n');
+    return count;
   }
 
   double recommendationMatchPercentage(Iterable<Listing> recommendations) {

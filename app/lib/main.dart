@@ -1,8 +1,6 @@
 // Soporte para SQLite en desktop (no importar en web)
 import 'dart:io' show Platform;
 // ignore: uri_does_not_exist
-import 'package:sqflite_common_ffi/sqflite_ffi.dart'
-  if (dart.library.html) 'main_noop.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -48,11 +46,6 @@ Future<void> main() async {
 
   runApp(UniMarketApp(notificationService: notificationService));
   
-  // Inicializar databaseFactory solo en desktop (no en web)
-  if (!identical(0, 0.0) && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
 }
 
 class UniMarketApp extends StatelessWidget {

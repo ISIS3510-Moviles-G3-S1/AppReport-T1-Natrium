@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:collection';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -26,6 +27,9 @@ class ListingService {
   final ImageAnalysisService _imageAnalysisService = CloudVisionImageAnalysisService();
 
   static const String _pendingOpsStorageKey = 'listing_pending_operations_v1';
+  static const String _cachedListingsKey = 'cached_listings';
+  static const int _maxCachedListings = 10;
+  static const String _listedCacheBoxName = 'listings_cache';
   static const String _typeCreate = 'pending_create';
   static const String _typeUpdate = 'pending_update';
   static const String _typeDelete = 'pending_delete';
@@ -62,18 +66,103 @@ class ListingService {
     return listing.createdAt;
   }
 
-  // Almacena los listados en Hive
+  // Stores listings in Hive using a LinkedHashMap so access order is preserved.
   Future<void> _cacheListings(List<Listing> listings) async {
-    final box = await Hive.openBox<List>('listings_cache');
-    await box.put('cached_listings', listings.map((listing) => listing.toJson()).toList());
-    debugPrint('Cached ${listings.length} listings in Hive.');
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+
+    for (final listing in listings) {
+      _touchListingCache(cache, listing.id, listing.toJson());
+    }
+
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+    await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+    debugPrint('Cached ${trimmed.length} listings in Hive (LinkedHashMap LRU, limit=$_maxCachedListings).');
   }
 
-  // Recupera los listados desde Hive
+  static LinkedHashMap<String, Map<String, dynamic>> _readLinkedListingCache(dynamic raw) {
+    final cache = LinkedHashMap<String, Map<String, dynamic>>();
+
+    if (raw is Map) {
+      for (final entry in raw.entries) {
+        final key = entry.key.toString();
+        final value = entry.value;
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          cache[key] = map.containsKey('listing') && map['listing'] is Map
+              ? Map<String, dynamic>.from(map['listing'] as Map)
+              : map;
+        }
+      }
+      return cache;
+    }
+
+    if (raw is List) {
+      for (final value in raw) {
+        if (value is Map) {
+          final map = Map<String, dynamic>.from(value);
+          final listing = map.containsKey('listing') && map['listing'] is Map
+              ? Map<String, dynamic>.from(map['listing'] as Map)
+              : map;
+          final id = listing['id']?.toString() ?? '';
+          if (id.isNotEmpty) {
+            cache[id] = listing;
+          }
+        }
+      }
+    }
+
+    return cache;
+  }
+
+  static Map<String, Map<String, dynamic>> _serializeLinkedListingCache(
+    LinkedHashMap<String, Map<String, dynamic>> cache,
+  ) {
+    return LinkedHashMap<String, Map<String, dynamic>>.from(cache);
+  }
+
+  static void _touchListingCache(
+    LinkedHashMap<String, Map<String, dynamic>> cache,
+    String listingId,
+    Map<String, dynamic> listingJson,
+  ) {
+    if (listingId.trim().isEmpty) return;
+    cache.remove(listingId);
+    cache[listingId] = Map<String, dynamic>.from(listingJson);
+  }
+
+  static LinkedHashMap<String, Map<String, dynamic>> _trimLinkedListingCache(
+    LinkedHashMap<String, Map<String, dynamic>> cache,
+    int max,
+  ) {
+    if (max <= 0) return LinkedHashMap<String, Map<String, dynamic>>();
+
+    final trimmed = LinkedHashMap<String, Map<String, dynamic>>.from(cache);
+    while (trimmed.length > max) {
+      trimmed.remove(trimmed.keys.first);
+    }
+    return trimmed;
+  }
+
+  // Restores cached listings from Hive and updates access order (LRU)
   Future<List<Listing>> _getCachedListings() async {
-    final box = await Hive.openBox<List>('listings_cache');
-    final cachedData = box.get('cached_listings', defaultValue: []) ?? [];
-    return cachedData.map<Listing>((json) => Listing.fromJson(json)).toList();
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+
+    if (trimmed.length != cache.length) {
+      await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+    }
+
+    return trimmed.values.map(Listing.fromJson).toList();
+  }
+
+  /// Helper for tests: trim a LinkedHashMap in LRU order and return kept keys.
+  static List<String> trimLinkedListingCacheKeys(
+    LinkedHashMap<String, Map<String, dynamic>> cache,
+    int max,
+  ) {
+    return _trimLinkedListingCache(cache, max).keys.toList(growable: false);
   }
 
   Stream<List<Listing>> getListings() async* {
@@ -101,7 +190,7 @@ class ListingService {
               return bCreated.compareTo(aCreated);
             });
 
-            await _cacheListings(listings); // Almacenar en Hive
+            await _cacheListings(listings); // Store in Hive
             debugPrint('Listings cached in Hive.');
             return listings;
           });
@@ -134,9 +223,26 @@ class ListingService {
   }
 
   Future<Listing?> getListingById(String id) async {
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+
+    final cachedListing = cache.remove(id);
+    if (cachedListing != null) {
+      cache[id] = cachedListing;
+      final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+      await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+      return Listing.fromJson(cachedListing);
+    }
+
     final doc = await _db.collection(_collection).doc(id).get();
     if (!doc.exists) return null;
-    return Listing.fromFirestore(doc);
+
+    final listing = Listing.fromFirestore(doc);
+    _touchListingCache(cache, listing.id, listing.toJson());
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+    await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+
+    return listing;
   }
 
   Future<void> syncPendingOperations() async {
