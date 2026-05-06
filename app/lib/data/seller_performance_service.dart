@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../core/seller_performance_period.dart';
 
@@ -31,6 +32,14 @@ class SellerPerformanceService {
     required SellerPerformancePeriod period,
   }) {
     final window = period.window;
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    final verified = user != null && user.emailVerified && email.endsWith('@uniandes.edu.co');
+    if (!verified) {
+      debugPrint('[SellerPerformanceService] watchSoldListingsForSeller: user not verified - returning zero stream');
+      return Stream.value(0);
+    }
+
     return _db
         .collection(_collection)
         .where('sellerId', isEqualTo: sellerId)
@@ -51,6 +60,8 @@ class SellerPerformanceService {
 
             return !confirmedAt.isBefore(window.start) && confirmedAt.isBefore(window.end);
           }).length;
+        }).handleError((e, st) {
+          debugPrint('[SellerPerformanceService] Firestore snapshot error: $e');
         });
   }
 
@@ -85,11 +96,22 @@ class SellerPerformanceService {
   Stream<int> watchPublishedListingsForSeller({
     required String sellerId,
   }) {
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    final verified = user != null && user.emailVerified && email.endsWith('@uniandes.edu.co');
+    if (!verified) {
+      debugPrint('[SellerPerformanceService] watchPublishedListingsForSeller: user not verified - returning zero stream');
+      return Stream.value(0);
+    }
+
     return _db
         .collection('listings')
         .where('sellerId', isEqualTo: sellerId)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) => snapshot.docs.length)
+        .handleError((e, st) {
+          debugPrint('[SellerPerformanceService] Firestore snapshot error: $e');
+        });
   }
 
   Future<int> _countWithSimpleFallback({

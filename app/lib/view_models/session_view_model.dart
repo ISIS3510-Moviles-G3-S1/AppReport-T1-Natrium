@@ -18,6 +18,9 @@ class SessionViewModel extends ChangeNotifier {
   final FirebaseFirestore _firestore;
   final NotificationService _notificationService;
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<SyncSummary>? _syncSummarySub;
+  final StreamController<String> _syncSummaryMessageController = StreamController<String>.broadcast();
+  Stream<String> get syncSummaryMessages => _syncSummaryMessageController.stream;
 
   // â”€â”€ LRU profile cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Capacity 50: covers the logged-in user + seller profiles viewed in a
@@ -57,6 +60,25 @@ class SessionViewModel extends ChangeNotifier {
         _setLoading(false);
       },
     );
+
+    // Listen to listing sync summaries to notify user when offline actions complete
+    _syncSummarySub = ListingService().syncSummaryStream.listen((summary) {
+      try {
+        final parts = <String>[];
+        if (summary.created > 0) parts.add('${summary.created} created');
+        if (summary.updated > 0) parts.add('${summary.updated} updated');
+        if (summary.deleted > 0) parts.add('${summary.deleted} deleted');
+        if (summary.aiTagged > 0) parts.add('${summary.aiTagged} AI-tagged');
+
+        if (parts.isEmpty) return;
+        final body = 'Offline actions completed: ' + parts.join(', ') + '.';
+        _syncSummaryMessageController.add(body);
+      } catch (e) {
+        debugPrint('[SessionViewModel] Failed to emit sync summary message: $e');
+      }
+    }, onError: (e) {
+      debugPrint('[SessionViewModel] syncSummaryStream error: $e');
+    });
   }
 
   Future<void> _forceLogoutOnStart() async {
@@ -207,6 +229,14 @@ class SessionViewModel extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _syncSummarySub?.cancel();
+    _syncSummaryMessageController.close();
+    super.dispose();
   }
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
