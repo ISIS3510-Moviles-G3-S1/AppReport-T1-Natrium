@@ -167,9 +167,11 @@ class ListingService {
 
   Stream<List<Listing>> getListings() async* {
     final isOnline = await _isOnline();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final canReadRemote = isOnline && _canUseFirestore(currentUser);
     debugPrint('Checking online status: $isOnline');
 
-    if (isOnline) {
+    if (canReadRemote) {
       debugPrint('Fetching listings from Firebase...');
       yield* _db
           .collection(_collection)
@@ -195,7 +197,7 @@ class ListingService {
             return listings;
           });
     } else {
-      debugPrint('Offline mode: Fetching cached listings from Hive...');
+      debugPrint('Using cached listings from Hive (offline or no Firestore access)...');
       final cachedListings = await _getCachedListings();
       debugPrint('Cached listings retrieved: ${cachedListings.length} items.');
       yield cachedListings;
@@ -203,23 +205,39 @@ class ListingService {
   }
 
   Stream<List<Listing>> getListingsBySellerId(String sellerId) {
-    return _db
-        .collection(_collection)
-        .where('sellerId', isEqualTo: sellerId)
-        .snapshots()
-        .map((snapshot) {
-          final listings =
-              snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList();
-          listings.sort((a, b) {
-            final aCreated = a.createdAt;
-            final bCreated = b.createdAt;
-            if (aCreated == null && bCreated == null) return 0;
-            if (aCreated == null) return 1;
-            if (bCreated == null) return -1;
-            return bCreated.compareTo(aCreated);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (_canUseFirestore(currentUser)) {
+      return _db
+          .collection(_collection)
+          .where('sellerId', isEqualTo: sellerId)
+          .snapshots()
+          .map((snapshot) {
+            final listings =
+                snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList();
+            listings.sort((a, b) {
+              final aCreated = a.createdAt;
+              final bCreated = b.createdAt;
+              if (aCreated == null && bCreated == null) return 0;
+              if (aCreated == null) return 1;
+              if (bCreated == null) return -1;
+              return bCreated.compareTo(aCreated);
+            });
+            return listings;
           });
-          return listings;
-        });
+    }
+
+    return Stream.fromFuture(_getCachedListings().then((cachedListings) {
+      final listings = cachedListings.where((listing) => listing.sellerId == sellerId).toList();
+      listings.sort((a, b) {
+        final aCreated = a.createdAt;
+        final bCreated = b.createdAt;
+        if (aCreated == null && bCreated == null) return 0;
+        if (aCreated == null) return 1;
+        if (bCreated == null) return -1;
+        return bCreated.compareTo(aCreated);
+      });
+      return listings;
+    }));
   }
 
   Future<Listing?> getListingById(String id) async {
@@ -243,6 +261,29 @@ class ListingService {
     await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
 
     return listing;
+  }
+
+  static bool _isVerifiedStudentUser(User? user) {
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    return user != null && user.emailVerified && email.endsWith('@uniandes.edu.co');
+  }
+
+  static bool _canUseFirestore(User? user) => _isVerifiedStudentUser(user);
+
+  Future<void> _upsertCachedListing(Listing listing) async {
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+    _touchListingCache(cache, listing.id, listing.toJson());
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+    await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
+  }
+
+  Future<void> _removeCachedListing(String listingId) async {
+    final box = await Hive.openBox(_listedCacheBoxName);
+    final cache = _readLinkedListingCache(box.get(_cachedListingsKey));
+    cache.remove(listingId);
+    final trimmed = _trimLinkedListingCache(cache, _maxCachedListings);
+    await box.put(_cachedListingsKey, _serializeLinkedListingCache(trimmed));
   }
 
   Future<void> syncPendingOperations() async {
@@ -287,13 +328,18 @@ class ListingService {
     final shouldQueuePendingTags = listing.tags.isEmpty && images.isNotEmpty;
     final isOnline = await _isOnline();
 
-    // For offline users with cached sessions, allow listing creation to queue.
-    // Firebase auth check only applies when online.
-    final user = isOnline ? FirebaseAuth.instance.currentUser : null;
+    final user = FirebaseAuth.instance.currentUser;
+    final canCreateRemote = isOnline && _canUseFirestore(user);
     final userId = user?.uid ?? 'unknown_user';
 
-    if (!isOnline) {
+    if (!canCreateRemote) {
       final localId = _localListingId();
+      final queuedListing = _cloneListingWith(
+        listing,
+        id: localId,
+        sellerId: userId,
+        createdAt: DateTime.now(),
+      );
       await _enqueueOperation({
         'opId': _operationId(),
         'type': _typeCreate,
@@ -305,26 +351,30 @@ class ListingService {
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
 
-      return _cloneListingWith(
-        listing,
-        id: localId,
-        sellerId: userId,
-        createdAt: DateTime.now(),
-      );
+      await _upsertCachedListing(queuedListing);
+
+      return queuedListing;
     }
 
-    // Online: ensure user is authenticated with Firebase
     if (user == null) throw Exception('User not authenticated');
 
     try {
-      return await _createListingOnline(
+      final created = await _createListingOnline(
         listing: listing,
         images: images,
         sellerId: user.uid,
       );
+      await _upsertCachedListing(created);
+      return created;
     } catch (e) {
       debugPrint('[ListingService] createListing online failed, queueing offline: $e');
       final localId = _localListingId();
+      final queuedListing = _cloneListingWith(
+        listing,
+        id: localId,
+        sellerId: user.uid,
+        createdAt: DateTime.now(),
+      );
       await _enqueueOperation({
         'opId': _operationId(),
         'type': _typeCreate,
@@ -336,12 +386,8 @@ class ListingService {
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
 
-      return _cloneListingWith(
-        listing,
-        id: localId,
-        sellerId: user.uid,
-        createdAt: DateTime.now(),
-      );
+      await _upsertCachedListing(queuedListing);
+      return queuedListing;
     }
   }
 
@@ -391,7 +437,10 @@ class ListingService {
 
   Future<bool> updateListing(Listing listing) async {
     final isOnline = await _isOnline();
-    if (!isOnline) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final canWriteRemote = isOnline && _canUseFirestore(currentUser);
+
+    if (!canWriteRemote) {
       await _enqueueOperation({
         'opId': _operationId(),
         'type': _typeUpdate,
@@ -400,11 +449,13 @@ class ListingService {
         'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      await _upsertCachedListing(listing);
       return true; // queued offline
     }
 
     try {
       await _db.collection(_collection).doc(listing.id).update(listing.toFirestore());
+      await _upsertCachedListing(listing);
       return false; // updated online
     } catch (e) {
       debugPrint('[ListingService] updateListing online failed, queueing offline: $e');
@@ -416,13 +467,17 @@ class ListingService {
         'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      await _upsertCachedListing(listing);
       return true; // queued after online failure
     }
   }
 
   Future<bool> deleteListing(Listing listing) async {
     final isOnline = await _isOnline();
-    if (!isOnline) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final canWriteRemote = isOnline && _canUseFirestore(currentUser);
+
+    if (!canWriteRemote) {
       await _enqueueOperation({
         'opId': _operationId(),
         'type': _typeDelete,
@@ -431,11 +486,13 @@ class ListingService {
         'imageURLs': listing.imageURLs,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      await _removeCachedListing(listing.id);
       return true;
     }
 
     try {
       await _deleteListingOnline(listing.id, listing.imageURLs);
+      await _removeCachedListing(listing.id);
       return false;
     } catch (e) {
       debugPrint('[ListingService] deleteListing online failed, queueing offline: $e');
@@ -447,6 +504,7 @@ class ListingService {
         'imageURLs': listing.imageURLs,
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      await _removeCachedListing(listing.id);
       return true;
     }
   }
@@ -489,6 +547,12 @@ class ListingService {
 
     try {
       if (!await _isOnline()) return;
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (!_canUseFirestore(currentUser)) {
+        debugPrint('[ListingService] Sync skipped: no verified Firestore user available.');
+        return;
+      }
 
       final queue = await _loadQueue();
       if (queue.isEmpty) return;
@@ -596,6 +660,18 @@ class ListingService {
 
       await _db.collection(_collection).doc(remoteListingId).set(firestoreData);
       op['remoteListingId'] = remoteListingId;
+
+      await _upsertCachedListing(
+        Listing.fromJson({
+          ...listingMap,
+          'id': remoteListingId,
+          'sellerId': sellerId,
+          'imageURLs': imageUrls,
+          'imagePath': imageUrls.isNotEmpty ? imageUrls[0] : '',
+          'tagsPending': shouldGeneratePendingTags,
+          'createdAt': DateTime.now().toIso8601String(),
+        }),
+      );
     }
 
     if (shouldGeneratePendingTags) {
@@ -621,6 +697,10 @@ class ListingService {
 
     final firestoreData = _queuedListingToFirestoreData(Map<String, dynamic>.from(listingRaw));
     await _db.collection(_collection).doc(listingIdOverride).update(firestoreData);
+    await _upsertCachedListing(Listing.fromJson({
+      ...firestoreData,
+      'id': listingIdOverride,
+    }));
   }
 
   Future<void> _applyDeleteOperation(
@@ -640,6 +720,7 @@ class ListingService {
     }
 
     await _deleteListingOnline(listingIdOverride, imageUrls);
+    await _removeCachedListing(listingIdOverride);
   }
 
   Future<void> _generateAndUpdateTags({
