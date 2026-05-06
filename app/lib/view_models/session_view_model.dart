@@ -523,10 +523,4 @@ class SessionViewModel extends ChangeNotifier {
     _errorMessage = message;
     notifyListeners();
   }
-
-  @override
-  void dispose() {
-    _authSubscription?.cancel();
-    super.dispose();
-  }
 }
