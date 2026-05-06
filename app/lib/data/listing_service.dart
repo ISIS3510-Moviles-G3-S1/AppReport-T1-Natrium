@@ -389,7 +389,7 @@ class ListingService {
     return Listing.fromFirestore(doc);
   }
 
-  Future<void> updateListing(Listing listing) async {
+  Future<bool> updateListing(Listing listing) async {
     final isOnline = await _isOnline();
     if (!isOnline) {
       await _enqueueOperation({
@@ -400,11 +400,12 @@ class ListingService {
         'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
-      return;
+      return true; // queued offline
     }
 
     try {
       await _db.collection(_collection).doc(listing.id).update(listing.toFirestore());
+      return false; // updated online
     } catch (e) {
       debugPrint('[ListingService] updateListing online failed, queueing offline: $e');
       await _enqueueOperation({
@@ -415,6 +416,7 @@ class ListingService {
         'listing': _serializeListingForQueue(listing, sellerId: listing.sellerId),
         'queuedAt': DateTime.now().toUtc().toIso8601String(),
       });
+      return true; // queued after online failure
     }
   }
 
@@ -540,32 +542,27 @@ class ListingService {
     final currentUser = FirebaseAuth.instance.currentUser;
     
     // Security: validate seller ownership during sync
-    // - If queued as 'unknown_user' (created offline): require current user to sync it
-    //   (only the user who created it offline can sync it by being logged in)
-    // - If queued with specific UID: require current user to match that UID
-    //   (prevents user impersonation across devices/sessions)
-    if (queuedSellerId == 'unknown_user') {
-      if (currentUser == null) {
-        throw StateError(
-          'Cannot sync offline-created listing: no user is authenticated. '
-          'Log in to sync this listing.',
-        );
-      }
-      debugPrint('[ListingService] Syncing offline-created listing with current user ${currentUser.uid}');
-    } else if (currentUser == null) {
-      throw StateError(
-        'Cannot sync listing: authentication required. '
-        'Log in as the user who created this listing.',
-      );
-    } else if (queuedSellerId != currentUser.uid) {
+    // - If queued with specific UID and current user mismatches: reject (prevent impersonation)
+    // - Otherwise: allow sync (offline users need flexibility, and matched users can always sync)
+    if (queuedSellerId != 'unknown_user' && 
+        currentUser != null && 
+        queuedSellerId != currentUser.uid) {
       throw StateError(
         'Cannot sync this listing: it was created by a different user. '
         'Log in as the original user to sync this listing.',
       );
     }
 
-    // Use current authenticated user's UID (now guaranteed to be set)
-    final sellerId = currentUser!.uid;
+    // Use current authenticated user if available, otherwise use queued sellerId
+    final sellerId = currentUser?.uid ?? queuedSellerId;
+    if (sellerId.isEmpty || sellerId == 'unknown_user') {
+      throw StateError(
+        'Cannot sync listing: no user context available. '
+        'Log in to sync this listing.',
+      );
+    }
+
+    debugPrint('[ListingService] Syncing listing with seller=$sellerId');
     final shouldGeneratePendingTags = op['pendingTags'] == true;
 
     final imagePaths = (op['imagePaths'] as List?)

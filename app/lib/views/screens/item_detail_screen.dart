@@ -276,8 +276,13 @@ class _InfoSectionState extends State<_InfoSection> {
       setState(() {
         _isEditMode = false;
       });
+      
+      final message = widget.vm.lastUpdateWasOffline
+          ? 'Your changes will be saved when internet connection is restored.'
+          : 'Listing updated successfully.';
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listing updated successfully.')),
+        SnackBar(content: Text(message)),
       );
     } catch (e) {
       if (!mounted) return;
