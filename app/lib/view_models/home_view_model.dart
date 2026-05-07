@@ -57,6 +57,20 @@ class HomeViewModel extends ChangeNotifier {
         newThreshold: DateTime.now().subtract(Duration(days: 5)),
       );
       notifyListeners();
+    }, onError: (error, stackTrace) async {
+      debugPrint('[HomeVM] listings stream failed, falling back to cache: $error');
+      final cachedListings = await _listingService.getListings().first;
+      _featured = cachedListings;
+      for (final l in _featured) {
+        _savedItems[l.id] = l.saved;
+      }
+      _recommendationService = RecommendationService(
+        allItems: cachedListings,
+        userFrequentCategories: _userFavoriteTags,
+        itemUploadDates: _itemUploadDates,
+        newThreshold: DateTime.now().subtract(Duration(days: 5)),
+      );
+      notifyListeners();
     });
   }
 

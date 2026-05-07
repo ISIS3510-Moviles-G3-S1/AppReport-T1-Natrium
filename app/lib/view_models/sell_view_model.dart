@@ -31,6 +31,8 @@ class SellViewModel extends ChangeNotifier {
   }
 
   bool _published = false;
+  bool _publishedOffline = false;
+  bool _hasQueuedAITags = false;
 
   String _title = '';
   String _description = '';
@@ -43,6 +45,8 @@ class SellViewModel extends ChangeNotifier {
   List<XFile> _images = [];
 
   bool get published => _published;
+  bool get publishedOffline => _publishedOffline;
+  bool get hasQueuedAITags => _hasQueuedAITags;
 
   String get title => _title;
   set title(String v) {
@@ -249,8 +253,12 @@ class SellViewModel extends ChangeNotifier {
       saved: false,
     );
     debugPrint('[SellVM] publishing ${_images.length} selected images');
-    await _listingService.createListing(listing: listing, images: _images);
+    final isOnline = await _listingService.isOnlineNow();
+    await _listingService.createListing(listing: listing, images: _images, knownOnline: isOnline);
     _published = true;
+    _publishedOffline = !isOnline;
+    // Track if AI tags will be generated offline (no tags provided + has images + offline)
+    _hasQueuedAITags = _tags.isEmpty && _images.isNotEmpty && !isOnline;
     await _clearDraft();
 
     final userId = user?.uid ?? '';
@@ -272,6 +280,8 @@ class SellViewModel extends ChangeNotifier {
 
   void resetAfterPublish() {
     _published = false;
+    _publishedOffline = false;
+    _hasQueuedAITags = false;
     _title = '';
     _images = [];
     _price = '';

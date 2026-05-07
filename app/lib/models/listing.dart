@@ -37,7 +37,6 @@ ListingStatus listingStatusFromString(String? value) {
 
 /// Light listing for browse grid and home featured.
 class Listing {
-    Map<String, dynamic> toJson() => toFirestore();
   final String id;
   final String sellerId;
   final String title;
@@ -81,6 +80,7 @@ class Listing {
   ListingStatus get listingStatus => listingStatusFromString(status);
   bool get isSold => listingStatus == ListingStatus.sold;
   bool get isActive => listingStatus == ListingStatus.active;
+  bool get isAvailable => !isSold;
 
   Listing copyWith({
     bool? saved,
@@ -197,6 +197,12 @@ class Listing {
 
   /// Crea una instancia de Listing a partir de un mapa JSON.
   static Listing fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) {
+      if (value is DateTime) return value;
+      if (value is String && value.trim().isNotEmpty) return DateTime.tryParse(value);
+      return null;
+    }
+
     return Listing(
       id: json['id'] ?? '',
       sellerId: json['sellerId'] ?? '',
@@ -209,8 +215,8 @@ class Listing {
       tags: _coerceStringList(json['tags']),
       rating: (json['rating'] ?? 0).toDouble(),
       imageName: json['imageName'] ?? '',
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
-      soldAt: json['soldAt'] != null ? DateTime.parse(json['soldAt']) : null,
+      createdAt: parseDate(json['createdAt']),
+      soldAt: parseDate(json['soldAt']),
       imagePath: json['imagePath'] ?? '',
       imageURLs: _coerceStringList(json['imageURLs']),
       size: json['size'] ?? '',
@@ -237,6 +243,29 @@ class Listing {
       'imageURLs': imageURLs,
       'size': size,
       'status': listingStatusToString(listingStatusFromString(status)),
+    };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'sellerId': sellerId,
+      'title': title,
+      'price': price,
+      'conditionTag': conditionTag,
+      'description': description,
+      'sellerName': sellerName,
+      'exchangeType': exchangeType,
+      'tags': tags,
+      'rating': rating,
+      'imageName': imageName,
+      'createdAt': createdAt?.toIso8601String(),
+      'soldAt': soldAt?.toIso8601String(),
+      'imagePath': imagePath,
+      'imageURLs': imageURLs,
+      'size': size,
+      'status': status,
+      'saved': saved,
     };
   }
 }

@@ -174,6 +174,12 @@ class ProfileViewModel extends ChangeNotifier {
       _rawListings = items;
       _refreshConfirmedSalesOverlay(user.uid);
       Future.microtask(_maybeGenerateEcoMessage);
+    }, onError: (error, stackTrace) async {
+      debugPrint('[ProfileVM] listings stream failed, falling back to cache: $error');
+      final cachedListings = await _listingService.getListings().first;
+      _rawListings = cachedListings.where((listing) => listing.sellerId == user.uid).toList();
+      _refreshConfirmedSalesOverlay(user.uid);
+      Future.microtask(_maybeGenerateEcoMessage);
     });
   }
 

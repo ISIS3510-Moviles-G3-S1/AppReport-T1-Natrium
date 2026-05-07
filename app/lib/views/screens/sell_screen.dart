@@ -158,25 +158,60 @@ class _PublishSuccess extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final mutedText = colorScheme.onSurface.withOpacity(0.72);
+    final isOffline = vm.publishedOffline;
+    final hasQueuedTags = vm.hasQueuedAITags;
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_rounded, size: 72, color: AppTheme.sage),
+            Icon(
+              isOffline ? Icons.cloud_queue_rounded : Icons.check_circle_rounded, 
+              size: 72, 
+              color: isOffline ? Colors.amber.shade600 : AppTheme.sage,
+            ),
             const SizedBox(height: 16),
             Text(
-              'Your listing is live!',
+              isOffline ? 'Listing saved!' : 'Your listing is live!',
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Remember to reuse and recycle.',
+              isOffline 
+                ? 'Your listing will be published when your connection is restored.'
+                : 'Remember to reuse and recycle.',
               style: TextStyle(color: mutedText),
               textAlign: TextAlign.center,
             ),
+            if (hasQueuedTags) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade600, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'AI tags will be generated when your connection is restored.',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () => vm.resetAfterPublish(),

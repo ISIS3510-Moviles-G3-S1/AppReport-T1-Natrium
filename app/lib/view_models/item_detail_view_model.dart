@@ -16,6 +16,7 @@ class ItemDetailViewModel extends ChangeNotifier {
   bool _saved = false;
   bool _messageSent = false;
   bool _isUpdating = false;
+  bool _lastUpdateWasOffline = false;
 
   ItemDetail? get item => _item;
   int get activeImageIndex => _activeImageIndex;
@@ -23,6 +24,7 @@ class ItemDetailViewModel extends ChangeNotifier {
   bool get messageSent => _messageSent;
   List<Map<String, dynamic>> get similarItems => _similarItems;
   bool get isUpdating => _isUpdating;
+  bool get lastUpdateWasOffline => _lastUpdateWasOffline;
 
   Future<void> loadItem(String id) async {
     final listing = await _listingService.getListingById(id);
@@ -161,7 +163,7 @@ class ItemDetailViewModel extends ChangeNotifier {
         saved: _saved,
       );
 
-      await _listingService.updateListing(listing);
+      _lastUpdateWasOffline = await _listingService.updateListing(listing);
 
       _item = ItemDetail(
         id: current.id,

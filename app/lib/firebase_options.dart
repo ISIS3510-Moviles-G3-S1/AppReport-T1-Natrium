@@ -60,11 +60,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyA5Bp-DHVvzMYBRryR-jUosEmWiTsMtGP4',
-    appId: '1:900978890680:ios:84fac44544597d0b35214d',
+    appId: '1:900978890680:ios:f94752e12a367c0935214d',
     messagingSenderId: '900978890680',
     projectId: 'unimarket-e3282',
     storageBucket: 'unimarket-e3282.firebasestorage.app',
-    iosBundleId: 'com.unimarket.uniMarket',
+    iosBundleId: 'com.sofiavasquez.unimarket',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

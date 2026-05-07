@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/meetup_qr_payload.dart';
 import '../models/meetup_transaction.dart';
@@ -149,6 +151,12 @@ class MeetupTransactionService {
         'confirmedAt': FieldValue.serverTimestamp(),
       });
 
+      final listingRef = _db.collection('listings').doc(meetupTx.listingId);
+      transaction.update(listingRef, {
+        'status': 'sold',
+        'soldAt': FieldValue.serverTimestamp(),
+      });
+
       return meetupTx.copyWith(
         status: MeetupTransactionStatus.confirmed,
         confirmedAt: DateTime.now(),
@@ -157,6 +165,14 @@ class MeetupTransactionService {
   }
 
   Stream<Set<String>> watchConfirmedListingIds() {
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    final verified = user != null && user.emailVerified && email.endsWith('@uniandes.edu.co');
+    if (!verified) {
+      debugPrint('[MeetupTransactionService] watchConfirmedListingIds: user not verified - returning empty stream');
+      return Stream.value(<String>{});
+    }
+
     return _db
         .collection(_collection)
         .where('status', isEqualTo: meetupStatusToString(MeetupTransactionStatus.confirmed))
@@ -166,6 +182,8 @@ class MeetupTransactionService {
               .map((doc) => (doc.data()['listingId'] as String?) ?? '')
               .where((id) => id.trim().isNotEmpty)
               .toSet();
+        }).handleError((e, st) {
+          debugPrint('[MeetupTransactionService] Firestore snapshot error: $e');
         });
   }
 }
