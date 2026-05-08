@@ -10,6 +10,7 @@ import '../models/sustainability_impact.dart';
 import '../core/eco_service.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
+import '../data/eco_cache.dart';
 import 'session_view_model.dart';
 
 Map<String, dynamic> _computeImpactPayloadIsolate(List<Map<String, dynamic>> rawItems) {
@@ -86,6 +87,7 @@ class ProfileViewModel extends ChangeNotifier {
   final EcoService _ecoService;
   final ListingService _listingService = ListingService();
   final MeetupTransactionService _meetupService = MeetupTransactionService();
+  final EcoCache _ecoCache = EcoCache(maxSize: 20, ttlMinutes: 60);
   StreamSubscription<List<Listing>>? _listingsSub;
   List<Listing> _listings = [];
   List<Listing> _rawListings = [];
@@ -223,7 +225,13 @@ class ProfileViewModel extends ChangeNotifier {
       return;
     }
     _listingsSub = _listingService.getListingsBySellerId(user.uid).listen((items) {
+      final oldCount = _rawListings.length;
       _rawListings = items;
+      // ── Invalidar cache cuando se detecta nueva prenda (cambio relevante) ──
+      if (_rawListings.length != oldCount) {
+        _ecoCache.invalidate();
+        debugPrint('[ProfileVM] ECO cache invalidated: ${_rawListings.length} listings detected');
+      }
       _refreshConfirmedSalesOverlay(user.uid);
       Future.microtask(_maybeGenerateEcoMessage);
     }, onError: (error, stackTrace) async {
@@ -238,7 +246,13 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> _refreshConfirmedSalesOverlay(String sellerId) async {
     try {
       final confirmedIds = await _meetupService.watchConfirmedListingIds().first;
+      final oldConfirmedCount = _confirmedListingIds.length;
       _confirmedListingIds = confirmedIds;
+      // ── Invalidar cache cuando cambian sales confirmadas ──
+      if (_confirmedListingIds.length != oldConfirmedCount) {
+        _ecoCache.invalidate();
+        debugPrint('[ProfileVM] ECO cache invalidated: confirmed sales changed');
+      }
       _listings = _rawListings.map((listing) {
         if (_confirmedListingIds.contains(listing.id)) {
           return listing.copyWith(status: 'sold');
@@ -255,6 +269,9 @@ class ProfileViewModel extends ChangeNotifier {
   }
 
   void _forwardSessionChanges() {
+    // ── Invalidar cache cuando usuario cambia (profile change) ──
+    _ecoCache.invalidate();
+    debugPrint('[ProfileVM] ECO cache invalidated: user session changed');
     _startListingsListener();
     notifyListeners();
     _primeCardsWithFutureHandler();
@@ -309,6 +326,17 @@ class ProfileViewModel extends ChangeNotifier {
       profileTransactions.toString(),
     ].join('|');
 
+    // ── Consultar LRU cache primero (cache hit antes de API call) ──
+    if (!forceRefresh) {
+      final cachedMessage = _ecoCache.get(requestHash);
+      if (cachedMessage != null) {
+        _ecoMessage = cachedMessage;
+        notifyListeners();
+        debugPrint('[ProfileVM] ECO cache HIT: ${_ecoCache.getStats()}');
+        return; // Skip API call
+      }
+    }
+
     final now = DateTime.now();
     final recentlyRequested =
         _lastEcoRequestHash == requestHash &&
@@ -341,6 +369,9 @@ class ProfileViewModel extends ChangeNotifier {
           .then((aiMessage) {
             if (requestToken != _ecoRequestToken) return;
             _ecoMessage = aiMessage.trim();
+            // ── Guardar en LRU cache (cache put después de API success) ──
+            _ecoCache.put(requestHash, _ecoMessage);
+            debugPrint('[ProfileVM] ECO cache PUT: ${_ecoCache.getStats()}');
           })
           .catchError((_) {
             // Keep fallback message on API errors.
