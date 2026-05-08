@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../data/chat_local_storage.dart';
 import '../data/chat_sync_service.dart';
+import '../data/chat_draft_storage.dart';
 import '../models/message.dart';
 
 class ChatViewModel extends ChangeNotifier {
@@ -18,6 +19,7 @@ class ChatViewModel extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ChatLocalStorage _localStorage = ChatLocalStorage.instance;
   final ChatSyncService _syncService = ChatSyncService.instance;
+  final ChatDraftStorage _draftStorage = ChatDraftStorage.instance;
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _remoteMessagesSub;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
@@ -256,6 +258,34 @@ class ChatViewModel extends ChangeNotifier {
             debugPrint(stack.toString());
           });
     }
+  }
+
+  Future<void> saveDraftForCurrentUser(String text) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    await _draftStorage.saveDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      text: text,
+    );
+  }
+
+  Future<String> getDraftForCurrentUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return '';
+    return _draftStorage.getDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
+  }
+
+  Future<void> clearDraftForCurrentUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    await _draftStorage.clearDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
   }
 
   Future<void> sendInitialMessage() async {

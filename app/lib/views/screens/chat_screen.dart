@@ -38,26 +38,42 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(_persistDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatViewModel>().initialize();
+      final vm = context.read<ChatViewModel>();
+      vm.initialize().then((_) async {
+        final draft = await vm.getDraftForCurrentUser();
+        if (!mounted || draft.isEmpty) return;
+        _messageController.text = draft;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _messageController.text.length),
+        );
+      });
     });
   }
 
   @override
   void dispose() {
+    _messageController.removeListener(_persistDraft);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _persistDraft() {
+    context.read<ChatViewModel>().saveDraftForCurrentUser(_messageController.text);
   }
 
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isNotEmpty && !_isSending) {
       setState(() => _isSending = true);
+      final sentText = text;
       _messageController.clear();
       final viewModel = context.read<ChatViewModel>();
       viewModel.sendMessage(text).then((_) {
         if (mounted) {
+          viewModel.clearDraftForCurrentUser();
           setState(() {
             _isSending = false;
             _errorMessage = null;
@@ -66,6 +82,10 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }).catchError((e) {
         if (mounted) {
+          _messageController.text = sentText;
+          _messageController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _messageController.text.length),
+          );
           setState(() {
             _isSending = false;
             _errorMessage = e.toString();

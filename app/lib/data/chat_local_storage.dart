@@ -121,16 +121,37 @@ class ChatLocalStorage {
     required int sentAtMillis,
   }) async {
     final db = await AppDatabase().database;
-    await db.update(
-      'chat_messages',
-      {
-        'remote_id': remoteId,
-        'sent_at': sentAtMillis,
-        'status': 'sent',
-      },
-      where: 'user_id = ? AND local_id = ?',
-      whereArgs: [userId, localId],
-    );
+    await db.transaction((txn) async {
+      // If a remote row already exists (race with remote listener), remove
+      // the local pending duplicate instead of violating UNIQUE(remote_id,user_id).
+      final existingRemote = await txn.query(
+        'chat_messages',
+        columns: ['local_id'],
+        where: 'user_id = ? AND remote_id = ?',
+        whereArgs: [userId, remoteId],
+        limit: 1,
+      );
+
+      if (existingRemote.isNotEmpty) {
+        await txn.delete(
+          'chat_messages',
+          where: 'user_id = ? AND local_id = ?',
+          whereArgs: [userId, localId],
+        );
+        return;
+      }
+
+      await txn.update(
+        'chat_messages',
+        {
+          'remote_id': remoteId,
+          'sent_at': sentAtMillis,
+          'status': 'sent',
+        },
+        where: 'user_id = ? AND local_id = ?',
+        whereArgs: [userId, localId],
+      );
+    });
 
     _changes.add(null);
   }
