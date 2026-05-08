@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:isolate';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -8,35 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_failure.dart';
 import '../../view_models/session_view_model.dart';
-
-// ── Isolate: validación de credenciales ───────────────────────────────────
-// Función top-level requerida por Isolate.run() — no puede ser un método.
-// Ejecuta validaciones de email/contraseña en un hilo separado para no
-// bloquear el UI thread durante expresiones regulares intensivas.
-Map<String, String?> _validateCredentialsIsolate(Map<String, String> input) {
-  final email = input['email'] ?? '';
-  final password = input['password'] ?? '';
-  final errors = <String, String?>{};
-
-  // Validación de formato de email con regex completo (RFC 5322 simplificado).
-  final emailRegex = RegExp(
-    r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
-  );
-  if (!emailRegex.hasMatch(email)) {
-    errors['email'] = 'Enter a valid email address';
-  }
-
-  // Validación de fortaleza de contraseña: mínimo 6 chars +
-  // al menos una letra y un número para mayor seguridad.
-  if (password.length < 6) {
-    errors['password'] = 'Password must be at least 6 characters';
-  } else if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
-      !RegExp(r'[0-9]').hasMatch(password)) {
-    errors['password'] = 'Password must include letters and numbers';
-  }
-
-  return errors;
-}
+import '../../data/offline_signup_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -90,10 +61,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
-    if (_isOffline) {
-      setState(() => _error = 'No internet connection. Please check your network.');
-      return;
-    }
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -103,49 +70,97 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    // Capturamos el ViewModel antes de cualquier await para no usar
-    // BuildContext después de un async gap (lint: use_build_context_synchronously).
+    final displayName = _emailController.text.split('@').first; // default: username parte del email
     final sessionVM = context.read<SessionViewModel>();
 
-    // ── Isolate: validación de credenciales en hilo separado ─────────────
-    // Usamos Isolate.run() para ejecutar el RegEx de email y el análisis
-    // de fortaleza de contraseña fuera del UI thread. Esto evita jank
-    // visible en dispositivos lentos y demuestra el patrón Isolate.
-    final validationErrors = await Isolate.run(
-      () => _validateCredentialsIsolate({'email': email, 'password': password}),
+    // ── Validación inline: email y contraseña ─────────────────────────────
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
     );
+    
+    String? validationError;
+    if (!emailRegex.hasMatch(email)) {
+      validationError = 'Enter a valid email address';
+    } else if (password.length < 6) {
+      validationError = 'Password must be at least 6 characters';
+    } else if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+        !RegExp(r'[0-9]').hasMatch(password)) {
+      validationError = 'Password must include letters and numbers';
+    }
 
-    if (validationErrors.isNotEmpty) {
+    if (validationError != null) {
       if (mounted) {
         setState(() {
-          _error = validationErrors.values.whereType<String>().join(' · ');
+          _error = validationError;
           _isLoading = false;
         });
       }
       return;
     }
 
-    // ── Future con handler (.then / .catchError / .whenComplete) ─────────
-    // Mismo patrón aplicado en LoginScreen: separamos lógica de éxito
-    // de la de error de forma reactiva, sin depender de try/catch en UI.
+    // ── EVENTUAL CONNECTIVITY: Offline Registration ────────────────────
+    // Si está offline, guardar localmente para sincronizar después
+    if (_isOffline) {
+      try {
+        await OfflineSignupService.savePendingSignUp(
+          email: email,
+          password: password,
+          displayName: displayName,
+        );
+        if (mounted) {
+          setState(() {
+            _error = null;
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Registration saved! Will complete when your connection is restored.',
+              ),
+              duration: Duration(seconds: 4),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Opcionalmente navegar atrás o esperar
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) context.go('/login');
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _error = 'Could not save registration offline.';
+            _isLoading = false;
+          });
+        }
+      }
+      return;
+    }
+
+    // ── Online: Future con handler (5pts) ──────────────────────────────
+    // Mismo patrón aplicado en LoginScreen
     sessionVM
-        .signUp(email: email, password: password)
+        .signUp(email: email, password: password, displayName: displayName)
         .then((_) {
-          // Handler de éxito: GoRouter redirect toma control automáticamente.
           debugPrint('[RegisterScreen] signUp succeeded (then-handler)');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            // Redirige a login en caso de éxito
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) context.go('/login');
+            });
+          }
         })
         .catchError((error) {
-          // Handler de error: captura AuthFailure o excepciones inesperadas.
           debugPrint('[RegisterScreen] catchError handler: $error');
           if (!mounted) return;
           final message = error is AuthFailure
               ? error.message
               : 'Unable to create account. Please try again';
-          setState(() => _error = message);
-        })
-        .whenComplete(() {
-          // whenComplete equivale al finally: siempre resetea el loading.
-          if (mounted) setState(() => _isLoading = false);
+          setState(() {
+            _error = message;
+            _isLoading = false;
+          });
         });
   }
 
