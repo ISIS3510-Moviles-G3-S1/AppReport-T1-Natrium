@@ -259,4 +259,58 @@ class AnalyticsEvent {
           'timestamp': AnalyticsValue.string(DateTime.now().toUtc().toIso8601String()),
         },
       );
+
+  // ---------------------------------------------------------------------------
+  // Type-4 Business Question: Monetizable sustainability data
+  // ---------------------------------------------------------------------------
+
+  /// Fired when a transaction is confirmed and we can attribute
+  /// estimated environmental impact to a clothing category.
+  static AnalyticsEvent sustainabilityImpactPerTransaction({
+    required String transactionId,
+    required String listingId,
+    required String sellerId,
+    required String category,
+    required int waterSavedLiters,
+    required double co2SavedKg,
+    required double wasteSavedKg,
+    required String timestamp,
+  }) =>
+      AnalyticsEvent(
+        name: 'sustainability_impact_per_transaction',
+        parameters: {
+          'transaction_id': AnalyticsValue.string(transactionId),
+          'listing_id': AnalyticsValue.string(listingId),
+          'seller_id': AnalyticsValue.string(sellerId),
+          'category': AnalyticsValue.string(category),
+          'water_saved_liters': AnalyticsValue.int(waterSavedLiters),
+          'co2_saved_kg': AnalyticsValue.doubleType(co2SavedKg),
+          'waste_saved_kg': AnalyticsValue.doubleType(wasteSavedKg),
+          'timestamp': AnalyticsValue.string(timestamp),
+          // Monetization hint for downstream segmentation.
+          'data_product': AnalyticsValue.string('esg_partnership_signal'),
+        },
+      );
+
+  /// Fired when the ECO recommendation message is produced for the user.
+  /// This enables correlation between message exposure and later engagement.
+  static AnalyticsEvent ecoRecommendationShown({
+    required String userId,
+    required String levelTitle,
+    required int soldCount,
+    required int transactions,
+    required int messageLength,
+    required String timestamp,
+  }) =>
+      AnalyticsEvent(
+        name: 'eco_recommendation_shown',
+        parameters: {
+          'user_id': AnalyticsValue.string(userId),
+          'level_title': AnalyticsValue.string(levelTitle),
+          'sold_count': AnalyticsValue.int(soldCount),
+          'transactions': AnalyticsValue.int(transactions),
+          'message_length': AnalyticsValue.int(messageLength),
+          'timestamp': AnalyticsValue.string(timestamp),
+        },
+      );
 }

@@ -7,6 +7,8 @@ import '../models/app_user.dart';
 import '../models/profile_models.dart';
 import '../models/listing.dart';
 import '../models/sustainability_impact.dart';
+import '../core/analytics_event.dart';
+import '../core/analytics_service.dart';
 import '../core/eco_service.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
@@ -372,6 +374,20 @@ class ProfileViewModel extends ChangeNotifier {
             // ── Guardar en LRU cache (cache put después de API success) ──
             _ecoCache.put(requestHash, _ecoMessage);
             debugPrint('[ProfileVM] ECO cache PUT: ${_ecoCache.getStats()}');
+
+            final uid = _user?.uid;
+            if (uid != null && _ecoMessage.isNotEmpty) {
+              AnalyticsService.instance.track(
+                AnalyticsEvent.ecoRecommendationShown(
+                  userId: uid,
+                  levelTitle: info.title,
+                  soldCount: soldCount,
+                  transactions: profileTransactions,
+                  messageLength: _ecoMessage.length,
+                  timestamp: DateTime.now().toUtc().toIso8601String(),
+                ),
+              );
+            }
           })
           .catchError((_) {
             // Keep fallback message on API errors.

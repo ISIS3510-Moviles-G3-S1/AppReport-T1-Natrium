@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../core/analytics_event.dart';
+import '../core/analytics_service.dart';
 import '../core/meetup_qr_payload.dart';
 import '../models/meetup_transaction.dart';
+import '../models/sustainability_impact.dart';
 
 class MeetupTransactionException implements Exception {
   final String code;
@@ -116,7 +119,7 @@ class MeetupTransactionService {
 
     final txRef = _db.collection(_collection).doc(payload.transactionId);
 
-    return _db.runTransaction((transaction) async {
+    final outcome = await _db.runTransaction((transaction) async {
       final txSnap = await transaction.get(txRef);
       if (!txSnap.exists) {
         throw const MeetupTransactionException(
@@ -152,16 +155,57 @@ class MeetupTransactionService {
       });
 
       final listingRef = _db.collection('listings').doc(meetupTx.listingId);
+      final listingSnap = await transaction.get(listingRef);
+      if (!listingSnap.exists) {
+        throw const MeetupTransactionException(
+          code: 'missing-listing',
+          message: 'Listing not found while confirming transaction.',
+        );
+      }
+      final listingData = listingSnap.data() ?? <String, dynamic>{};
+
       transaction.update(listingRef, {
         'status': 'sold',
         'soldAt': FieldValue.serverTimestamp(),
       });
 
-      return meetupTx.copyWith(
+      final updatedTx = meetupTx.copyWith(
         status: MeetupTransactionStatus.confirmed,
         confirmedAt: DateTime.now(),
       );
+
+      return <String, dynamic>{
+        'transaction': updatedTx,
+        'listingTitle': (listingData['title'] as String?) ?? '',
+        'listingTags': List<String>.from(
+          listingData['tags'] as List<dynamic>? ?? const <dynamic>[],
+        ),
+      };
     });
+
+    final confirmedTx = outcome['transaction'] as MeetupTransaction;
+    final listingTitle = (outcome['listingTitle'] as String?) ?? '';
+    final listingTags = List<String>.from(
+      outcome['listingTags'] as List<dynamic>? ?? const <dynamic>[],
+    );
+
+    final category = ImpactCategory.infer(tags: listingTags, title: listingTitle);
+    final coeff = category.coefficients;
+
+    AnalyticsService.instance.track(
+      AnalyticsEvent.sustainabilityImpactPerTransaction(
+        transactionId: confirmedTx.transactionId,
+        listingId: confirmedTx.listingId,
+        sellerId: confirmedTx.sellerId,
+        category: category.name,
+        waterSavedLiters: coeff.water,
+        co2SavedKg: coeff.co2,
+        wasteSavedKg: coeff.waste,
+        timestamp: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+
+    return confirmedTx;
   }
 
   Stream<Set<String>> watchConfirmedListingIds() {
