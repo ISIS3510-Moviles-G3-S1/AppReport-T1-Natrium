@@ -11,6 +11,7 @@ import '../core/auth_failure.dart';
 import '../core/lru_cache.dart';
 import '../core/notification_service.dart';
 import '../data/listing_service.dart';
+import '../data/offline_signup_service.dart';
 import '../models/app_user.dart';
 
 class SessionViewModel extends ChangeNotifier {
@@ -45,6 +46,14 @@ class SessionViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// Stream reactivo del estado de autenticación de Firebase.
+  ///
+  /// Emite `true` cuando hay un usuario autenticado, `false` cuando no.
+  /// Consumido por LoginScreen vía StreamBuilder para reflejar cambios
+  /// en tiempo real (ej: sesión expirada, login desde otro dispositivo).
+  Stream<bool> get authStateStream =>
+      _auth.authStateChanges().map((user) => user != null);
+
   SessionViewModel({
     required NotificationService notificationService,
     FirebaseAuth? auth,
@@ -53,6 +62,8 @@ class SessionViewModel extends ChangeNotifier {
         _firestore = firestore ?? FirebaseFirestore.instance,
         _notificationService = notificationService {
     _forceLogoutOnStart();
+    // Intentar sincronizar pending signup cuando SessionVM inicia (app abre)
+    Future.microtask(_trySyncOfflinePendingSignUp);
     _authSubscription = _auth.authStateChanges().listen(
       _handleAuthState,
       onError: (_, __) {
@@ -71,7 +82,7 @@ class SessionViewModel extends ChangeNotifier {
         if (summary.aiTagged > 0) parts.add('${summary.aiTagged} AI-tagged');
 
         if (parts.isEmpty) return;
-        final body = 'Offline actions completed: ' + parts.join(', ') + '.';
+        final body = 'Offline actions completed: ${parts.join(', ')}.';
         _syncSummaryMessageController.add(body);
       } catch (e) {
         debugPrint('[SessionViewModel] Failed to emit sync summary message: $e');
@@ -228,6 +239,53 @@ class SessionViewModel extends ChangeNotifier {
       throw failure;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Intenta sincronizar un pending signup guardado offline cuando hay conexión.
+  /// Se llama automáticamente:
+  /// - En el constructor (cuando SessionVM inicia al abrir app)
+  /// - Opcionalmente desde un connectivity listener (cuando se detecta reconexión)
+  /// 
+  /// Flow: 
+  /// 1. Obtiene pending signup de SharedPreferences
+  /// 2. Si existe, intenta hacer signUp() con esos datos
+  /// 3. Si success: limpia SharedPrefs, notifica usuario
+  /// 4. Si falla: deja pending para intentar en próximas veces
+  Future<void> _trySyncOfflinePendingSignUp() async {
+    try {
+      final pending = await OfflineSignupService.getPendingSignUp();
+      if (pending == null) {
+        return; // No hay pending signup para sincronizar
+      }
+
+      final email = pending['email'];
+      final password = pending['password'];
+      final displayName = pending['displayName'];
+
+      if (email == null || password == null || displayName == null) {
+        return; // Datos incompletos
+      }
+
+      debugPrint('[SessionViewModel] Intentando sincronizar pending signup: $email');
+
+      // Intentar hacer el signup con los datos guardados
+      await signUp(email: email, password: password, displayName: displayName);
+
+      // Si llegamos aquí, el signup fue exitoso
+      await OfflineSignupService.clearPendingSignUp();
+      debugPrint('[SessionViewModel] Pending signup sincronizado exitosamente: $email');
+
+      // Notificar al usuario (opcional)
+      _notificationService.showNotification(
+        title: 'Registration Complete',
+        body: 'Your registration was completed successfully!',
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[SessionViewModel] Error sincronizando pending signup: ${e.message}');
+      // No buscamos en SharedPrefs aquí; se volverá a intentar en próximo reinicio
+    } catch (e) {
+      debugPrint('[SessionViewModel] Unexpected error syncing pending signup: $e');
     }
   }
 

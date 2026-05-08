@@ -1,7 +1,13 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../data/chat_local_storage.dart';
+import '../data/chat_sync_service.dart';
+import '../data/chat_draft_storage.dart';
 import '../models/message.dart';
 
 class ChatViewModel extends ChangeNotifier {
@@ -11,6 +17,17 @@ class ChatViewModel extends ChangeNotifier {
   final String itemName;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final ChatLocalStorage _localStorage = ChatLocalStorage.instance;
+  final ChatSyncService _syncService = ChatSyncService.instance;
+  final ChatDraftStorage _draftStorage = ChatDraftStorage.instance;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _remoteMessagesSub;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  Stream<List<Message>>? _messagesStream;
+  bool _isInitialized = false;
+  bool _isOffline = false;
+
+  bool get isOffline => _isOffline;
 
   ChatViewModel({
     required this.conversationId,
@@ -20,13 +37,132 @@ class ChatViewModel extends ChangeNotifier {
   });
 
   Stream<List<Message>> get messagesStream {
-    return _firestore
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value(const []);
+    }
+
+    if (!_isInitialized) {
+      unawaited(initialize());
+    }
+
+    return _messagesStream ??
+        _localStorage.watchMessages(
+          userId: user.uid,
+          conversationId: conversationId,
+        );
+  }
+
+  Future<void> initialize() async {
+    if (_isInitialized) {
+      return;
+    }
+
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    _isInitialized = true;
+    _messagesStream = _localStorage.watchMessages(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
+
+    await _localStorage.upsertConversation(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      otherUserId: otherUserId,
+      otherUserName: otherUserName,
+      itemName: itemName,
+      lastMessageText: '',
+      lastMessageAt: DateTime.now().millisecondsSinceEpoch,
+      lastMessageStatus: 'sent',
+    );
+
+    await _refreshConnectivity();
+    _subscribeConnectivity();
+
+    if (!_isOffline) {
+      await ensureConversationExists();
+      await _syncService.preloadAllConversationsForCurrentUser();
+      _startRemoteMessagesListener();
+      await _syncService.syncPendingMessagesForCurrentUser();
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> _refreshConnectivity() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    _isOffline = _isDisconnected(connectivity);
+  }
+
+  void _subscribeConnectivity() {
+    _connectivitySub ??= Connectivity().onConnectivityChanged.listen((results) {
+      final wasOffline = _isOffline;
+      _isOffline = _isDisconnected(results);
+
+      if (wasOffline && !_isOffline) {
+        unawaited(ensureConversationExists());
+        unawaited(_syncService.preloadAllConversationsForCurrentUser());
+        _startRemoteMessagesListener();
+        unawaited(_syncService.syncPendingMessagesForCurrentUser());
+      }
+
+      if (_isOffline) {
+        _remoteMessagesSub?.cancel();
+        _remoteMessagesSub = null;
+      }
+
+      notifyListeners();
+    });
+  }
+
+  bool _isDisconnected(List<ConnectivityResult> results) {
+    if (results.isEmpty) {
+      return true;
+    }
+    return results.every((result) => result == ConnectivityResult.none);
+  }
+
+  void _startRemoteMessagesListener() {
+    if (_remoteMessagesSub != null) {
+      return;
+    }
+
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    _remoteMessagesSub = _firestore
         .collection('conversations')
         .doc(conversationId)
         .collection('messages')
         .orderBy('sentAt', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => Message.fromFirestore(doc)).toList());
+        .listen((snapshot) async {
+      for (final doc in snapshot.docs) {
+        final message = Message.fromFirestore(doc);
+        await _localStorage.upsertRemoteMessage(
+          userId: currentUser.uid,
+          conversationId: conversationId,
+          message: message,
+        );
+      }
+
+      await _localStorage.refreshConversationFromMessages(
+        userId: currentUser.uid,
+        conversationId: conversationId,
+        fallbackOtherUserId: otherUserId,
+        fallbackOtherUserName: otherUserName,
+        fallbackItemName: itemName,
+      );
+    }, onError: (error, stack) {
+      debugPrint('[ChatViewModel] Remote listener failed: $error');
+      debugPrint(stack.toString());
+    });
   }
 
   Future<void> ensureConversationExists() async {
@@ -86,45 +222,70 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    debugPrint('[ChatViewModel] sendMessage: uid=${currentUser.uid}, email=${currentUser.email}, emailVerified=${currentUser.emailVerified}, isAnonymous=${currentUser.isAnonymous}');
-
-    try {
-      final tokenResult = await currentUser.getIdTokenResult(true);
-      debugPrint('[ChatViewModel] ID token claims: ${tokenResult.claims}');
-    } catch (tokenError) {
-      debugPrint('[ChatViewModel] Failed to fetch ID token result: $tokenError');
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
     }
 
-    try {
-      final messageData = {
-        'senderId': currentUser.uid,
-        'text': text,
-        'imageURLs': [],
-        'type': 'text',
-        'sentAt': Timestamp.now(),
-        'status': 'sent',
-      };
+    final now = DateTime.now().millisecondsSinceEpoch;
 
-      // Update conversation document with last message info
-      debugPrint('[ChatViewModel] Updating conversation $conversationId with last message info');
-      await _firestore.collection('conversations').doc(conversationId).set({
-        'participants': [currentUser.uid, otherUserId],
-        'lastMessageText': text,
-        'lastMessageAt': messageData['sentAt'],
-        'itemName': itemName,
-      }, SetOptions(merge: true));
+    await _localStorage.enqueueOutgoingMessage(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      senderId: currentUser.uid,
+      text: normalized,
+    );
 
-      debugPrint('[ChatViewModel] Adding message to conversation $conversationId: $messageData');
-      await _firestore
-          .collection('conversations')
-          .doc(conversationId)
-          .collection('messages')
-          .add(messageData);
-      debugPrint('[ChatViewModel] Message send completed successfully.');
-    } catch (e, stack) {
-      debugPrint('[ChatViewModel] Error sending message: $e');
-      debugPrint(stack.toString());
+    await _localStorage.upsertConversation(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      otherUserId: otherUserId,
+      otherUserName: otherUserName,
+      itemName: itemName,
+      lastMessageText: normalized,
+      lastMessageAt: now,
+      lastMessageStatus: 'pending',
+    );
+
+    if (!_isOffline) {
+      await _syncService
+          .syncPendingMessagesForCurrentUser()
+          .then((_) {
+            debugPrint('[ChatViewModel] Pending messages synced after send.');
+          })
+          .catchError((error, stack) {
+            debugPrint('[ChatViewModel] Pending sync after send failed: $error');
+            debugPrint(stack.toString());
+          });
     }
+  }
+
+  Future<void> saveDraftForCurrentUser(String text) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    await _draftStorage.saveDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      text: text,
+    );
+  }
+
+  Future<String> getDraftForCurrentUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return '';
+    return _draftStorage.getDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
+  }
+
+  Future<void> clearDraftForCurrentUser() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+    await _draftStorage.clearDraft(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
   }
 
   Future<void> sendInitialMessage() async {
@@ -134,31 +295,16 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    debugPrint('[ChatViewModel] sendInitialMessage for convo $conversationId, uid=${currentUser.uid}');
-    await ensureConversationExists();
+    final cached = await _localStorage.getMessages(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+    );
 
-    try {
-      // Check if there are messages from current user
-      final messages = await _firestore
-          .collection('conversations')
-          .doc(conversationId)
-          .collection('messages')
-          .where('senderId', isEqualTo: currentUser.uid)
-          .limit(1)
-          .get();
-
-      if (messages.docs.isNotEmpty) {
-        debugPrint('[ChatViewModel] sendInitialMessage skipped: existing message found');
-        return; // already sent
-      }
-
-      await sendMessage("Hi! Is the $itemName still available?");
-    } catch (e, stack) {
-      debugPrint('[ChatViewModel] sendInitialMessage error: $e');
-      debugPrint(stack.toString());
-      // If permission denied or other error, still try to send the message
-      await sendMessage("Hi! Is the $itemName still available?");
+    if (cached.isNotEmpty) {
+      return;
     }
+
+    await sendMessage('Hi! Is the $itemName still available?');
   }
 
   Future<void> markMessagesAsRead() async {
@@ -168,7 +314,15 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    debugPrint('[ChatViewModel] markMessagesAsRead for convo $conversationId, uid=${currentUser.uid}');
+    await _localStorage.markMessagesAsRead(
+      userId: currentUser.uid,
+      conversationId: conversationId,
+      currentUserId: currentUser.uid,
+    );
+
+    if (_isOffline) {
+      return;
+    }
 
     try {
       final messagesRef = _firestore
@@ -193,5 +347,12 @@ class ChatViewModel extends ChangeNotifier {
       debugPrint('[ChatViewModel] markMessagesAsRead error: $e');
       debugPrint(stack.toString());
     }
+  }
+
+  @override
+  void dispose() {
+    _remoteMessagesSub?.cancel();
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 }

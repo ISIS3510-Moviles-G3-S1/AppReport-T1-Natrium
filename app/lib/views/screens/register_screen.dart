@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_failure.dart';
 import '../../view_models/session_view_model.dart';
+import '../../data/offline_signup_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,11 +25,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   String? _error;
 
+  // ── Connectivity ─────────────────────────────────────────────────────────
+  bool _isOffline = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final initial = await Connectivity().checkConnectivity();
+    if (mounted) setState(() => _isOffline = _isDisconnected(initial));
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (mounted) setState(() => _isOffline = _isDisconnected(results));
+    });
+  }
+
+  bool _isDisconnected(dynamic result) {
+    if (result is List<ConnectivityResult>) {
+      return result.every((r) => r == ConnectivityResult.none);
+    }
+    if (result is ConnectivityResult) return result == ConnectivityResult.none;
+    return false;
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _connectivitySub?.cancel();
     super.dispose();
   }
 
@@ -37,31 +68,100 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _error = null;
     });
 
-    try {
-      await context.read<SessionViewModel>().signUp(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          );
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final displayName = _emailController.text.split('@').first; // default: username parte del email
+    final sessionVM = context.read<SessionViewModel>();
 
-      if (!mounted) return;
-
-      // ⚠️ Normalmente el router redirige solo,
-      // pero dejamos fallback limpio:
-      context.go('/');
-
-    } on AuthFailure catch (failure) {
-      if (!mounted) return;
-      setState(() {
-        _error = failure.message;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Unable to create account. Please try again';
-        _isLoading = false;
-      });
+    // ── Validación inline: email y contraseña ─────────────────────────────
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
+    );
+    
+    String? validationError;
+    if (!emailRegex.hasMatch(email)) {
+      validationError = 'Enter a valid email address';
+    } else if (password.length < 6) {
+      validationError = 'Password must be at least 6 characters';
+    } else if (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+        !RegExp(r'[0-9]').hasMatch(password)) {
+      validationError = 'Password must include letters and numbers';
     }
+
+    if (validationError != null) {
+      if (mounted) {
+        setState(() {
+          _error = validationError;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    // ── EVENTUAL CONNECTIVITY: Offline Registration ────────────────────
+    // Si está offline, guardar localmente para sincronizar después
+    if (_isOffline) {
+      try {
+        await OfflineSignupService.savePendingSignUp(
+          email: email,
+          password: password,
+          displayName: displayName,
+        );
+        if (mounted) {
+          setState(() {
+            _error = null;
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Registration saved! Will complete when your connection is restored.',
+              ),
+              duration: Duration(seconds: 4),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Opcionalmente navegar atrás o esperar
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) context.go('/login');
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _error = 'Could not save registration offline.';
+            _isLoading = false;
+          });
+        }
+      }
+      return;
+    }
+
+    // ── Online: Future con handler (5pts) ──────────────────────────────
+    // Mismo patrón aplicado en LoginScreen
+    sessionVM
+        .signUp(email: email, password: password, displayName: displayName)
+        .then((_) {
+          debugPrint('[RegisterScreen] signUp succeeded (then-handler)');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            // Redirige a login en caso de éxito
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) context.go('/login');
+            });
+          }
+        })
+        .catchError((error) {
+          debugPrint('[RegisterScreen] catchError handler: $error');
+          if (!mounted) return;
+          final message = error is AuthFailure
+              ? error.message
+              : 'Unable to create account. Please try again';
+          setState(() {
+            _error = message;
+            _isLoading = false;
+          });
+        });
   }
 
   @override
@@ -71,9 +171,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
         title: const Text('Create account'),
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
+        child: Column(
+          children: [
+            // ── Offline banner ──────────────────────────────────────────
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeInOut,
+              height: _isOffline ? 48 : 0,
+              color: const Color(0xFFF59E0B),
+              child: _isOffline
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.wifi_off_rounded, size: 18, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'No internet connection',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
               const SizedBox(height: 16),
@@ -211,7 +338,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 16),
 
-              
               TextButton(
                 onPressed: () {
                   context.go('/login');
@@ -219,9 +345,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: const Text('Already have an account? Log in'),
               ),
             ],
-          ),
-        ),
-      ),
+          ),     // ListView
+        ),       // Form
+      ),         // Expanded
+          ],     // Column children
+        ),       // Column
+      ),         // SafeArea
     );
   }
 }

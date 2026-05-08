@@ -38,26 +38,42 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(_persistDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatViewModel>().ensureConversationExists();
+      final vm = context.read<ChatViewModel>();
+      vm.initialize().then((_) async {
+        final draft = await vm.getDraftForCurrentUser();
+        if (!mounted || draft.isEmpty) return;
+        _messageController.text = draft;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _messageController.text.length),
+        );
+      });
     });
   }
 
   @override
   void dispose() {
+    _messageController.removeListener(_persistDraft);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _persistDraft() {
+    context.read<ChatViewModel>().saveDraftForCurrentUser(_messageController.text);
   }
 
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isNotEmpty && !_isSending) {
       setState(() => _isSending = true);
+      final sentText = text;
       _messageController.clear();
       final viewModel = context.read<ChatViewModel>();
       viewModel.sendMessage(text).then((_) {
         if (mounted) {
+          viewModel.clearDraftForCurrentUser();
           setState(() {
             _isSending = false;
             _errorMessage = null;
@@ -66,6 +82,10 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }).catchError((e) {
         if (mounted) {
+          _messageController.text = sentText;
+          _messageController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _messageController.text.length),
+          );
           setState(() {
             _isSending = false;
             _errorMessage = e.toString();
@@ -116,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ChatViewModel>();
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -130,6 +151,27 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            width: double.infinity,
+            height: vm.isOffline ? 52 : 0,
+            color: Colors.amber.shade700,
+            alignment: Alignment.center,
+            child: vm.isOffline
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      "You're offline. Pending messages will be sent as soon as connectivity is back.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
           // Listing banner
           if (widget.itemName.isNotEmpty)
             Container(
@@ -174,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Messages list
           Expanded(
             child: StreamBuilder<List<Message>>(
-              stream: context.watch<ChatViewModel>().messagesStream,
+              stream: vm.messagesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -271,15 +313,19 @@ class _ChatScreenState extends State<ChatScreen> {
                                     style: Theme.of(context).textTheme.labelSmall,
                                   ),
                                   if (isCurrentUser)
-                                    Icon(
-                                      message.readAt != null 
-                                        ? Icons.done_all 
-                                        : Icons.done,
-                                      size: 12,
-                                      color: message.readAt != null 
-                                        ? Theme.of(context).primaryColor 
-                                        : Colors.grey,
-                                    ),
+                                    message.status == 'pending'
+                                        ? const Icon(
+                                            Icons.schedule,
+                                            size: 12,
+                                            color: Colors.orange,
+                                          )
+                                        : Icon(
+                                            message.readAt != null ? Icons.done_all : Icons.done,
+                                            size: 12,
+                                            color: message.readAt != null
+                                                ? Theme.of(context).primaryColor
+                                                : Colors.grey,
+                                          ),
                                 ],
                               ),
                             ),
