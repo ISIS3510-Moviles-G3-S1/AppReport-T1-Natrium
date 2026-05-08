@@ -48,6 +48,8 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   connectivity_plus: ^6.0.5
+  sqflite: ^2.4.1
+  path: ^1.9.1
   palette_generator: ^0.3.3+6
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.2

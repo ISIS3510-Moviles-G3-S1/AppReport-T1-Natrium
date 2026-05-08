@@ -41,6 +41,25 @@ class Message {
     );
   }
 
+  factory Message.fromLocalMap(Map<String, dynamic> row) {
+    final sentAtMillis = (row['sent_at'] as int?) ?? DateTime.now().millisecondsSinceEpoch;
+    final readAtMillis = row['read_at'] as int?;
+    return Message(
+      id: (row['remote_id'] as String?) ?? (row['local_id'] as String?) ?? '',
+      senderId: (row['sender_id'] as String?) ?? '',
+      text: (row['text'] as String?) ?? '',
+      imageURLs: const [],
+      type: (row['type'] as String?) ?? 'text',
+      sentAt: Timestamp.fromMillisecondsSinceEpoch(sentAtMillis),
+      readAt: readAtMillis == null
+          ? null
+          : Timestamp.fromMillisecondsSinceEpoch(readAtMillis),
+      status: (row['status'] as String?) ?? 'sent',
+      replyTo: null,
+      listingSnapshot: null,
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
     return {
       'senderId': senderId,

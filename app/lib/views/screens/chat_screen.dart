@@ -39,7 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatViewModel>().ensureConversationExists();
+      context.read<ChatViewModel>().initialize();
     });
   }
 
@@ -116,6 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ChatViewModel>();
     final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -130,6 +131,27 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            width: double.infinity,
+            height: vm.isOffline ? 52 : 0,
+            color: Colors.amber.shade700,
+            alignment: Alignment.center,
+            child: vm.isOffline
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      "You're offline. Pending messages will be sent as soon as connectivity is back.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
           // Listing banner
           if (widget.itemName.isNotEmpty)
             Container(
@@ -174,7 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Messages list
           Expanded(
             child: StreamBuilder<List<Message>>(
-              stream: context.watch<ChatViewModel>().messagesStream,
+              stream: vm.messagesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -271,15 +293,19 @@ class _ChatScreenState extends State<ChatScreen> {
                                     style: Theme.of(context).textTheme.labelSmall,
                                   ),
                                   if (isCurrentUser)
-                                    Icon(
-                                      message.readAt != null 
-                                        ? Icons.done_all 
-                                        : Icons.done,
-                                      size: 12,
-                                      color: message.readAt != null 
-                                        ? Theme.of(context).primaryColor 
-                                        : Colors.grey,
-                                    ),
+                                    message.status == 'pending'
+                                        ? const Icon(
+                                            Icons.schedule,
+                                            size: 12,
+                                            color: Colors.orange,
+                                          )
+                                        : Icon(
+                                            message.readAt != null ? Icons.done_all : Icons.done,
+                                            size: 12,
+                                            color: message.readAt != null
+                                                ? Theme.of(context).primaryColor
+                                                : Colors.grey,
+                                          ),
                                 ],
                               ),
                             ),
