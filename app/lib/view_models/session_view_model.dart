@@ -45,6 +45,14 @@ class SessionViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// Stream reactivo del estado de autenticación de Firebase.
+  ///
+  /// Emite `true` cuando hay un usuario autenticado, `false` cuando no.
+  /// Consumido por LoginScreen vía StreamBuilder para reflejar cambios
+  /// en tiempo real (ej: sesión expirada, login desde otro dispositivo).
+  Stream<bool> get authStateStream =>
+      _auth.authStateChanges().map((user) => user != null);
+
   SessionViewModel({
     required NotificationService notificationService,
     FirebaseAuth? auth,
@@ -71,7 +79,7 @@ class SessionViewModel extends ChangeNotifier {
         if (summary.aiTagged > 0) parts.add('${summary.aiTagged} AI-tagged');
 
         if (parts.isEmpty) return;
-        final body = 'Offline actions completed: ' + parts.join(', ') + '.';
+        final body = 'Offline actions completed: ${parts.join(', ')}.';
         _syncSummaryMessageController.add(body);
       } catch (e) {
         debugPrint('[SessionViewModel] Failed to emit sync summary message: $e');
