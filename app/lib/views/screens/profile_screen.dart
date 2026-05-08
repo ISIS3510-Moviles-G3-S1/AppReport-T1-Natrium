@@ -242,10 +242,34 @@ class ProfileScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: Consumer<ProfileViewModel>(
-                  builder: (context, vm, _) => EcoMessageCard(
-                    message: vm.ecoMessage,
-                    isLoading: vm.isGeneratingEcoMessage,
-                  ),
+                  builder: (context, vm, _) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StreamBuilder<ProfileCardAsyncEvent>(
+                          stream: vm.cardEvents,
+                          initialData: vm.lastCardEvent,
+                          builder: (context, snapshot) {
+                            final event = snapshot.data;
+                            final isRunning =
+                                event?.phase == ProfileCardAsyncPhase.ecoRunning ||
+                                event?.phase == ProfileCardAsyncPhase.impactRunning;
+                            if (!isRunning) {
+                              return const SizedBox.shrink();
+                            }
+                            return const Padding(
+                              padding: EdgeInsets.only(bottom: 8),
+                              child: LinearProgressIndicator(minHeight: 3),
+                            );
+                          },
+                        ),
+                        EcoMessageCard(
+                          message: vm.ecoMessage,
+                          isLoading: vm.isGeneratingEcoMessage,
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,52 @@ import '../core/eco_service.dart';
 import '../data/listing_service.dart';
 import '../data/meetup_transaction_service.dart';
 import 'session_view_model.dart';
+
+Map<String, dynamic> _computeImpactPayloadIsolate(List<Map<String, dynamic>> rawItems) {
+  final items = rawItems
+      .map((item) => (
+            tags: List<String>.from(item['tags'] as List<dynamic>? ?? const <String>[]),
+            title: (item['title'] as String?) ?? '',
+          ))
+      .toList(growable: false);
+
+  final impact = SustainabilityImpact.fromListings(items);
+  return {
+    'itemsReused': impact.itemsReused,
+    'waterLiters': impact.waterLiters,
+    'co2Kg': impact.co2Kg,
+    'wasteKg': impact.wasteKg,
+    'categoryCounts': impact.categoryCounts.map((k, v) => MapEntry(k.name, v)),
+  };
+}
+
+Map<String, dynamic> _buildCardWarmupSeedIsolate(Map<String, dynamic> input) {
+  final sanitizedName = (input['displayName'] as String? ?? '').trim();
+  return {
+    'displayName': sanitizedName,
+    'xp': input['xp'] ?? 0,
+    'transactions': input['transactions'] ?? 0,
+    'soldCount': input['soldCount'] ?? 0,
+  };
+}
+
+enum ProfileCardAsyncPhase {
+  ecoRunning,
+  ecoCompleted,
+  impactRunning,
+  impactCompleted,
+  failed,
+}
+
+class ProfileCardAsyncEvent {
+  const ProfileCardAsyncEvent({
+    required this.phase,
+    this.message,
+  });
+
+  final ProfileCardAsyncPhase phase;
+  final String? message;
+}
 
 class EcoLevelInfo {
   const EcoLevelInfo({
@@ -31,6 +78,7 @@ class ProfileViewModel extends ChangeNotifier {
   ProfileViewModel(this._session, {EcoService? ecoService}) : _ecoService = ecoService ?? EcoService() {
     _session.addListener(_forwardSessionChanges);
     _startListingsListener();
+    _primeCardsWithFutureHandler();
     Future.microtask(() => _maybeGenerateEcoMessage(forceRefresh: true));
   }
 
@@ -39,7 +87,6 @@ class ProfileViewModel extends ChangeNotifier {
   final ListingService _listingService = ListingService();
   final MeetupTransactionService _meetupService = MeetupTransactionService();
   StreamSubscription<List<Listing>>? _listingsSub;
-  StreamSubscription<Set<String>>? _confirmedSalesSub;
   List<Listing> _listings = [];
   List<Listing> _rawListings = [];
   Set<String> _confirmedListingIds = {};
@@ -56,6 +103,9 @@ class ProfileViewModel extends ChangeNotifier {
   String? _lastImpactRequestHash;
   DateTime? _lastImpactRequestAt;
   int _impactRequestToken = 0;
+  final StreamController<ProfileCardAsyncEvent> _cardEventsController =
+      StreamController<ProfileCardAsyncEvent>.broadcast();
+  ProfileCardAsyncEvent? _lastCardEvent;
 
   AppUser? get _user => _session.currentUser;
 
@@ -106,6 +156,8 @@ class ProfileViewModel extends ChangeNotifier {
   SustainabilityImpact get impactSummary => _impactSummary;
   String get impactMessage => _impactMessage;
   bool get isGeneratingImpact => _isGeneratingImpact;
+  Stream<ProfileCardAsyncEvent> get cardEvents => _cardEventsController.stream;
+  ProfileCardAsyncEvent? get lastCardEvent => _lastCardEvent;
 
   int get soldCount => _listings.where((item) => item.isSold).length;
 
@@ -193,11 +245,11 @@ class ProfileViewModel extends ChangeNotifier {
         }
         return listing;
       }).toList();
-      _recomputeImpact();
+      await _recomputeImpact();
       notifyListeners();
     } catch (_) {
       _listings = _rawListings;
-      _recomputeImpact();
+      await _recomputeImpact();
       notifyListeners();
     }
   }
@@ -205,12 +257,31 @@ class ProfileViewModel extends ChangeNotifier {
   void _forwardSessionChanges() {
     _startListingsListener();
     notifyListeners();
+    _primeCardsWithFutureHandler();
     Future.microtask(_maybeGenerateEcoMessage);
   }
 
-  Future<void> refreshEcoMessage() => _maybeGenerateEcoMessage(forceRefresh: true);
+  Future<void> refreshEcoMessage() async {
+    await _maybeGenerateEcoMessage(forceRefresh: true)
+        .then((_) => _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.ecoCompleted)))
+        .catchError((error) {
+      _emitCardEvent(ProfileCardAsyncEvent(
+        phase: ProfileCardAsyncPhase.failed,
+        message: 'Eco refresh failed: $error',
+      ));
+    });
+  }
 
-  Future<void> refreshImpactMessage() => _maybeGenerateImpactInsight(forceRefresh: true);
+  Future<void> refreshImpactMessage() async {
+    await _maybeGenerateImpactInsight(forceRefresh: true)
+        .then((_) => _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.impactCompleted)))
+        .catchError((error) {
+      _emitCardEvent(ProfileCardAsyncEvent(
+        phase: ProfileCardAsyncPhase.failed,
+        message: 'Impact refresh failed: $error',
+      ));
+    });
+  }
 
   Future<void> _maybeGenerateEcoMessage({bool forceRefresh = false}) async {
     final user = _user;
@@ -253,26 +324,31 @@ class ProfileViewModel extends ChangeNotifier {
 
     final requestToken = ++_ecoRequestToken;
     _isGeneratingEcoMessage = true;
+    _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.ecoRunning));
     notifyListeners();
 
     try {
-      final aiMessage = await _ecoService.generateRecommendation(
-        displayName: profileName,
-        rating: profileRating,
-        xp: xp,
-        levelTitle: info.title,
-        xpToNext: info.xpToNext,
-        soldCount: soldCount,
-        transactions: profileTransactions,
-      );
-
-      if (requestToken != _ecoRequestToken) return;
-      _ecoMessage = aiMessage.trim();
-    } catch (_) {
-      // Keep fallback message on API errors.
+      await _ecoService
+          .generateRecommendation(
+            displayName: profileName,
+            rating: profileRating,
+            xp: xp,
+            levelTitle: info.title,
+            xpToNext: info.xpToNext,
+            soldCount: soldCount,
+            transactions: profileTransactions,
+          )
+          .then((aiMessage) {
+            if (requestToken != _ecoRequestToken) return;
+            _ecoMessage = aiMessage.trim();
+          })
+          .catchError((_) {
+            // Keep fallback message on API errors.
+          });
     } finally {
       if (requestToken == _ecoRequestToken) {
         _isGeneratingEcoMessage = false;
+        _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.ecoCompleted));
         notifyListeners();
       }
     }
@@ -325,12 +401,35 @@ class ProfileViewModel extends ChangeNotifier {
 
   // ── Sustainability impact ─────────────────────────────────────────────────
 
-  void _recomputeImpact() {
-    final soldListings = _listings.where((l) => l.isSold).toList();
-    final items = soldListings
-        .map((l) => (tags: l.tags, title: l.title))
-        .toList();
-    _impactSummary = SustainabilityImpact.fromListings(items);
+  Future<void> _recomputeImpact() async {
+    final soldListings = _listings.where((l) => l.isSold).toList(growable: false);
+    final rawItems = soldListings
+        .map((l) => <String, dynamic>{'tags': l.tags, 'title': l.title})
+        .toList(growable: false);
+
+    final payload = await Isolate.run(() => _computeImpactPayloadIsolate(rawItems));
+
+    final countsRaw = Map<String, dynamic>.from(
+      payload['categoryCounts'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+    );
+
+    final counts = <ImpactCategory, int>{};
+    for (final entry in countsRaw.entries) {
+      final category = ImpactCategory.values.firstWhere(
+        (value) => value.name == entry.key,
+        orElse: () => ImpactCategory.other,
+      );
+      counts[category] = (entry.value as num?)?.toInt() ?? 0;
+    }
+
+    _impactSummary = SustainabilityImpact(
+      itemsReused: (payload['itemsReused'] as num?)?.toInt() ?? 0,
+      waterLiters: (payload['waterLiters'] as num?)?.toInt() ?? 0,
+      co2Kg: (payload['co2Kg'] as num?)?.toDouble() ?? 0,
+      wasteKg: (payload['wasteKg'] as num?)?.toDouble() ?? 0,
+      categoryCounts: counts,
+    );
+
     Future.microtask(_maybeGenerateImpactInsight);
   }
 
@@ -371,20 +470,26 @@ class ProfileViewModel extends ChangeNotifier {
 
     final requestToken = ++_impactRequestToken;
     _isGeneratingImpact = true;
+    _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.impactRunning));
     notifyListeners();
 
     try {
-      final insight = await _ecoService.generateImpactInsight(
-        impact: _impactSummary,
-        displayName: profileName,
-      );
-      if (requestToken != _impactRequestToken) return;
-      _impactMessage = insight;
-    } catch (_) {
-      // Keep previous message on error.
+      await _ecoService
+          .generateImpactInsight(
+            impact: _impactSummary,
+            displayName: profileName,
+          )
+          .then((insight) {
+            if (requestToken != _impactRequestToken) return;
+            _impactMessage = insight;
+          })
+          .catchError((_) {
+            // Keep previous message on error.
+          });
     } finally {
       if (requestToken == _impactRequestToken) {
         _isGeneratingImpact = false;
+        _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.impactCompleted));
         notifyListeners();
       }
     }
@@ -408,10 +513,41 @@ class ProfileViewModel extends ChangeNotifier {
     return parts.sublist(1).join('-').trim();
   }
 
+  void _primeCardsWithFutureHandler() {
+    _warmupCardSeedFuture()
+        .then((_) {
+          _emitCardEvent(const ProfileCardAsyncEvent(phase: ProfileCardAsyncPhase.ecoCompleted));
+        })
+        .catchError((error) {
+          _emitCardEvent(ProfileCardAsyncEvent(
+            phase: ProfileCardAsyncPhase.failed,
+            message: 'Card warmup failed: $error',
+          ));
+        });
+  }
+
+  Future<Map<String, dynamic>> _warmupCardSeedFuture() async {
+    final seed = <String, dynamic>{
+      'displayName': profileName,
+      'xp': xp,
+      'transactions': profileTransactions,
+      'soldCount': soldCount,
+    };
+    return Isolate.run(() => _buildCardWarmupSeedIsolate(seed));
+  }
+
+  void _emitCardEvent(ProfileCardAsyncEvent event) {
+    _lastCardEvent = event;
+    if (!_cardEventsController.isClosed) {
+      _cardEventsController.add(event);
+    }
+  }
+
   @override
   void dispose() {
     _session.removeListener(_forwardSessionChanges);
     _listingsSub?.cancel();
+    _cardEventsController.close();
     super.dispose();
   }
 }
