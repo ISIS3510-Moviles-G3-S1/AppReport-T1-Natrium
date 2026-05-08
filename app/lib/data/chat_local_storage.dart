@@ -157,6 +157,17 @@ class ChatLocalStorage {
     );
   }
 
+  Future<int> getPendingCount({
+    required String userId,
+  }) async {
+    final db = await AppDatabase().database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS total FROM chat_messages WHERE user_id = ? AND status = ?',
+      [userId, 'pending'],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<void> upsertConversation({
     required String userId,
     required String conversationId,

@@ -246,7 +246,15 @@ class ChatViewModel extends ChangeNotifier {
     );
 
     if (!_isOffline) {
-      await _syncService.syncPendingMessagesForCurrentUser();
+      await _syncService
+          .syncPendingMessagesForCurrentUser()
+          .then((_) {
+            debugPrint('[ChatViewModel] Pending messages synced after send.');
+          })
+          .catchError((error, stack) {
+            debugPrint('[ChatViewModel] Pending sync after send failed: $error');
+            debugPrint(stack.toString());
+          });
     }
   }
 

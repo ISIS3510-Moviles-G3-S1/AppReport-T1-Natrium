@@ -25,7 +25,9 @@ class _InboxScreenState extends State<InboxScreen> {
 
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _remoteConversationSub;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  StreamSubscription<ChatSyncEvent>? _syncEventsSub;
   bool _isOffline = false;
+  int _pendingToSync = 0;
 
   @override
   void initState() {
@@ -36,6 +38,12 @@ class _InboxScreenState extends State<InboxScreen> {
   Future<void> _initialize() async {
     await _refreshConnectivity();
     _listenConnectivity();
+    _listenSyncEvents();
+
+    final user = _auth.currentUser;
+    if (user != null) {
+      _loadPendingCountWithHandler(user.uid);
+    }
 
     if (!_isOffline) {
       await _syncService.preloadAllConversationsForCurrentUser();
@@ -46,6 +54,37 @@ class _InboxScreenState extends State<InboxScreen> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  void _loadPendingCountWithHandler(String userId) {
+    _localStorage
+        .getPendingCount(userId: userId)
+        .then((pendingCount) {
+          if (!mounted) return;
+          setState(() => _pendingToSync = pendingCount);
+        })
+        .catchError((error) {
+          debugPrint('[InboxScreen] pending count read failed: $error');
+        });
+  }
+
+  void _listenSyncEvents() {
+    _syncEventsSub ??= _syncService.events.listen((event) {
+      final user = _auth.currentUser;
+      if (user != null) {
+        _loadPendingCountWithHandler(user.uid);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      if (event.phase == ChatSyncPhase.failed && event.message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Chat sync failed: ${event.message}')),
+        );
+      }
+    });
   }
 
   Future<void> _refreshConnectivity() async {
@@ -144,6 +183,7 @@ class _InboxScreenState extends State<InboxScreen> {
   void dispose() {
     _remoteConversationSub?.cancel();
     _connectivitySub?.cancel();
+    _syncEventsSub?.cancel();
     super.dispose();
   }
 
@@ -191,6 +231,20 @@ class _InboxScreenState extends State<InboxScreen> {
                   )
                 : null,
           ),
+          if (_pendingToSync > 0)
+            Container(
+              width: double.infinity,
+              color: Colors.orange.withValues(alpha: 0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                'Pending messages to sync: $_pendingToSync',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange,
+                ),
+              ),
+            ),
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _localStorage.watchConversations(userId: currentUser.uid),
